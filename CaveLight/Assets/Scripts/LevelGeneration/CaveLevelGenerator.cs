@@ -1,12 +1,14 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
+using UnityEngine.UI;
 
 public class CaveLevelGenerator : MonoBehaviour
 {
     [Header("Tilemaps")]
     public Tilemap wallTilemap;
     public Tilemap groundTilemap;
+    public Tilemap decorationTilemap;
 
     [Header("Tiles")]
     public Tile wallTile;
@@ -30,6 +32,20 @@ public class CaveLevelGenerator : MonoBehaviour
     public Transform levelObjectsRoot;
     private int caveAmount = 0;
     private GameObject currentExit;
+
+    [Header("Merchant Room")]
+    public int cavesBeforeMerchant = 3;
+    public int cavesClearedSinceMerchant = 0;
+    public int totalCavesCleared = 0;
+    public GameObject merchantRoomPanel;
+    public Button enterNextCaveButton;
+    public MerchantRoomController merchantRoomController;
+    public bool inMerchantRoom = false;
+
+    [Header("Energy Nodes")]
+    public GameObject caveEnergyNodePrefab;
+    public int minCaveEnergyNodes = 2;
+    public int maxCaveEnergyNodes = 4;
 
     private const int SpawnPlatformXStart = 1;
     private const int SpawnPlatformY = 1;
@@ -59,13 +75,42 @@ public class CaveLevelGenerator : MonoBehaviour
     void Start()
     {
         caveAmount = 1;
+        cavesClearedSinceMerchant = 0;
+        totalCavesCleared = 0;
+        inMerchantRoom = false;
+
+        if (merchantRoomPanel != null)
+        {
+            merchantRoomPanel.SetActive(false);
+        }
+
+        if (enterNextCaveButton != null)
+        {
+            enterNextCaveButton.onClick.RemoveListener(ExitMerchantRoom);
+            enterNextCaveButton.onClick.AddListener(ExitMerchantRoom);
+        }
+
+        if (merchantRoomController == null)
+        {
+            merchantRoomController = FindFirstObjectByType<MerchantRoomController>();
+        }
+
         GenerateLevel();
         Debug.Log("Enter cave: 1");
     }
 
+    void OnValidate()
+    {
+        cavesBeforeMerchant = Mathf.Max(1, cavesBeforeMerchant);
+        cavesClearedSinceMerchant = Mathf.Max(0, cavesClearedSinceMerchant);
+        totalCavesCleared = Mathf.Max(0, totalCavesCleared);
+        minCaveEnergyNodes = Mathf.Max(0, minCaveEnergyNodes);
+        maxCaveEnergyNodes = Mathf.Max(minCaveEnergyNodes, maxCaveEnergyNodes);
+    }
+
     void Update()
     {
-        if (Input.GetKeyDown(KeyCode.R))
+        if (!inMerchantRoom && Input.GetKeyDown(KeyCode.R))
         {
             GenerateLevel();
             Debug.Log("[CaveLevelGenerator] Regenerated map on R key.");
@@ -74,27 +119,107 @@ public class CaveLevelGenerator : MonoBehaviour
 
     public void GoToNextCave()
     {
+        CompleteCurrentCave();
+    }
+
+    public void CompleteCurrentCave()
+    {
+        if (inMerchantRoom)
+        {
+            return;
+        }
+
+        totalCavesCleared += 1;
+        cavesClearedSinceMerchant += 1;
+        Debug.Log($"[CaveLevelGenerator] Cave cleared. totalCavesCleared={totalCavesCleared}, cavesClearedSinceMerchant={cavesClearedSinceMerchant}");
+
+        if (cavesClearedSinceMerchant >= cavesBeforeMerchant)
+        {
+            EnterMerchantRoom();
+            return;
+        }
+
         caveAmount += 1;
         Debug.Log("Enter cave: " + caveAmount);
         GenerateLevel();
     }
 
+    public void EnterMerchantRoom()
+    {
+        inMerchantRoom = true;
+
+        if (merchantRoomPanel != null)
+        {
+            merchantRoomPanel.SetActive(true);
+        }
+
+        if (merchantRoomController == null)
+        {
+            merchantRoomController = FindFirstObjectByType<MerchantRoomController>();
+        }
+
+        if (merchantRoomController != null)
+        {
+            merchantRoomController.OnEnterMerchantRoom();
+        }
+
+        EnsureLevelObjectsRoot();
+        ClearDynamicLevelObjects();
+        ClearAllLevelTilemaps();
+
+        if (player != null)
+        {
+            Rigidbody2D prb = player.GetComponent<Rigidbody2D>();
+            if (prb != null)
+            {
+                prb.linearVelocity = Vector2.zero;
+                prb.angularVelocity = 0f;
+            }
+
+            player.gameObject.SetActive(false);
+        }
+
+        Debug.Log("Enter merchant room.");
+    }
+
+    public void ExitMerchantRoom()
+    {
+        inMerchantRoom = false;
+        cavesClearedSinceMerchant = 0;
+
+        if (merchantRoomPanel != null)
+        {
+            merchantRoomPanel.SetActive(false);
+        }
+
+        if (player != null)
+        {
+            player.gameObject.SetActive(true);
+        }
+
+        caveAmount += 1;
+        GenerateLevel();
+        Debug.Log("Leave merchant room. Generate new cave.");
+        Debug.Log("Enter cave: " + caveAmount);
+    }
+
     public void GenerateLevel()
     {
+        if (inMerchantRoom)
+        {
+            return;
+        }
+
         if (wallTilemap == null || groundTilemap == null || wallTile == null || groundTile == null)
         {
             Debug.LogWarning("[CaveLevelGenerator] Missing references. Please assign Tilemaps and Tiles in the Inspector.");
             return;
         }
 
-        wallTilemap.ClearAllTiles();
-        groundTilemap.ClearAllTiles();
+        ClearAllLevelTilemaps();
 
-        if (currentExit != null)
-        {
-            Destroy(currentExit);
-            currentExit = null;
-        }
+        EnsureLevelObjectsRoot();
+        ClearDynamicLevelObjects();
 
         DrawBoundsAndBaseFloor();
 
@@ -106,10 +231,72 @@ public class CaveLevelGenerator : MonoBehaviour
         PlacePlayer(spawnCell, groundCell);
 
         PlatformData exitPlatform = mainPathPlatforms[mainPathPlatforms.Count - 1];
-        SpawnExitOnLastPlatform(exitPlatform);
+        Vector3Int exitCell = SpawnExitOnLastPlatform(exitPlatform);
+        SpawnCaveEnergyNodes(mainPathPlatforms, exitCell);
 
         LogMainPath(mainPathPlatforms);
         Debug.Log("[CaveLevelGenerator] Map generation completed.");
+    }
+
+    private void ClearAllLevelTilemaps()
+    {
+        if (wallTilemap != null)
+        {
+            wallTilemap.ClearAllTiles();
+        }
+
+        if (groundTilemap != null)
+        {
+            groundTilemap.ClearAllTiles();
+        }
+
+        if (decorationTilemap != null)
+        {
+            decorationTilemap.ClearAllTiles();
+        }
+    }
+
+    private void ClearDynamicLevelObjects()
+    {
+        if (levelObjectsRoot != null)
+        {
+            for (int i = levelObjectsRoot.childCount - 1; i >= 0; i--)
+            {
+                GameObject child = levelObjectsRoot.GetChild(i).gameObject;
+                if (Application.isPlaying)
+                {
+                    Destroy(child);
+                }
+                else
+                {
+                    DestroyImmediate(child);
+                }
+            }
+        }
+        else if (currentExit != null)
+        {
+            if (Application.isPlaying)
+            {
+                Destroy(currentExit);
+            }
+            else
+            {
+                DestroyImmediate(currentExit);
+            }
+        }
+
+        currentExit = null;
+    }
+
+    private void EnsureLevelObjectsRoot()
+    {
+        if (levelObjectsRoot != null)
+        {
+            return;
+        }
+
+        GameObject root = new GameObject("LevelObjectsRoot");
+        levelObjectsRoot = root.transform;
     }
 
     private void DrawBoundsAndBaseFloor()
@@ -357,7 +544,7 @@ public class CaveLevelGenerator : MonoBehaviour
         Debug.Log($"[CaveLevelGenerator] wallTile at groundCell is null? {tileAtGround == null}");
     }
 
-    private void SpawnExitOnLastPlatform(PlatformData lastPlatform)
+    private Vector3Int SpawnExitOnLastPlatform(PlatformData lastPlatform)
     {
         Vector3Int exitCell = new Vector3Int(lastPlatform.xStart + lastPlatform.width / 2, lastPlatform.y + 2, 0);
         Vector3 exitWorldPos = wallTilemap.GetCellCenterWorld(exitCell);
@@ -366,7 +553,7 @@ public class CaveLevelGenerator : MonoBehaviour
         {
             Debug.LogWarning("[CaveLevelGenerator] Exit prefab not assigned. Skipping exit spawn.");
             Debug.Log($"[CaveLevelGenerator] Exit target cell={exitCell}, world pos={exitWorldPos}, last platform xStart={lastPlatform.xStart}, width={lastPlatform.width}, y={lastPlatform.y}");
-            return;
+            return exitCell;
         }
 
         currentExit = Instantiate(exitPrefab, exitWorldPos, Quaternion.identity, levelObjectsRoot);
@@ -387,6 +574,113 @@ public class CaveLevelGenerator : MonoBehaviour
         trigger.SetLevelGenerator(this);
 
         Debug.Log($"[CaveLevelGenerator] Exit spawned at cell={exitCell}, world pos={exitWorldPos}, last platform xStart={lastPlatform.xStart}, width={lastPlatform.width}, y={lastPlatform.y}");
+        return exitCell;
+    }
+
+    private void SpawnCaveEnergyNodes(List<PlatformData> platforms, Vector3Int exitCell)
+    {
+        if (caveEnergyNodePrefab == null)
+        {
+            Debug.LogWarning("[CaveLevelGenerator] Cave energy node prefab not assigned. Skipping cave energy nodes.");
+            return;
+        }
+
+        List<int> candidatePlatformIndices = new List<int>();
+        for (int i = 1; i < platforms.Count; i++)
+        {
+            PlatformData platform = platforms[i];
+            if (platform.width < 3)
+            {
+                continue;
+            }
+
+            if (platform.XEnd <= SpawnPlatformXStart + SpawnPlatformWidth + 1)
+            {
+                continue;
+            }
+
+            candidatePlatformIndices.Add(i);
+        }
+
+        Shuffle(candidatePlatformIndices);
+
+        int targetNodeCount = Random.Range(minCaveEnergyNodes, maxCaveEnergyNodes + 1);
+        targetNodeCount = Mathf.Clamp(targetNodeCount, 0, candidatePlatformIndices.Count);
+        int spawnedCount = 0;
+
+        for (int i = 0; i < candidatePlatformIndices.Count && spawnedCount < targetNodeCount; i++)
+        {
+            int platformIndex = candidatePlatformIndices[i];
+            PlatformData platform = platforms[platformIndex];
+
+            if (!TryGetEnergyNodeCell(platform, exitCell, out Vector3Int nodeCell))
+            {
+                continue;
+            }
+
+            Vector3 worldPos = wallTilemap.GetCellCenterWorld(nodeCell);
+            GameObject node = Instantiate(caveEnergyNodePrefab, worldPos, Quaternion.identity, levelObjectsRoot);
+            node.name = "CaveEnergyNodePlaceholder";
+
+            if (node.GetComponent<CaveEnergyNode>() == null)
+            {
+                Debug.LogWarning($"[CaveLevelGenerator] Spawned cave energy node at {nodeCell} is missing CaveEnergyNode script.");
+            }
+
+            if (node.GetComponent<BoxCollider2D>() == null)
+            {
+                Debug.LogWarning($"[CaveLevelGenerator] Spawned cave energy node at {nodeCell} is missing BoxCollider2D.");
+            }
+
+            Debug.Log($"[CaveLevelGenerator] Cave energy node platform index={platformIndex}, cell={nodeCell}, world pos={worldPos}");
+            spawnedCount++;
+        }
+
+        Debug.Log($"[CaveLevelGenerator] Spawned {spawnedCount} cave energy nodes.");
+    }
+
+    private bool TryGetEnergyNodeCell(PlatformData platform, Vector3Int exitCell, out Vector3Int nodeCell)
+    {
+        int minX = platform.xStart + 1;
+        int maxX = platform.xStart + platform.width - 2;
+
+        if (minX > maxX)
+        {
+            nodeCell = default;
+            return false;
+        }
+
+        List<int> validXCells = new List<int>();
+        for (int x = minX; x <= maxX; x++)
+        {
+            if (x == exitCell.x && platform.y + 2 == exitCell.y)
+            {
+                continue;
+            }
+
+            validXCells.Add(x);
+        }
+
+        if (validXCells.Count == 0)
+        {
+            nodeCell = default;
+            return false;
+        }
+
+        int selectedX = validXCells[Random.Range(0, validXCells.Count)];
+        nodeCell = new Vector3Int(selectedX, platform.y + 2, 0);
+        return true;
+    }
+
+    private void Shuffle(List<int> values)
+    {
+        for (int i = values.Count - 1; i > 0; i--)
+        {
+            int swapIndex = Random.Range(0, i + 1);
+            int temp = values[i];
+            values[i] = values[swapIndex];
+            values[swapIndex] = temp;
+        }
     }
 
     private void LogMainPath(List<PlatformData> platforms)

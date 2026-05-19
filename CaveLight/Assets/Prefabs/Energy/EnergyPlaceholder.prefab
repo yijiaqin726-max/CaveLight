@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 8304560270555663065}
   - component: {fileID: 1768248219195456255}
   - component: {fileID: 982198293346219851}
+  - component: {fileID: 9030528351197567705}
   m_Layer: 0
   m_Name: EnergyPlaceholder
   m_TagString: Untagged
@@ -152,3 +153,17 @@ CircleCollider2D:
   m_CompositeOrder: 0
   m_Offset: {x: 0, y: 0}
   m_Radius: 0.25
+--- !u!114 &9030528351197567705
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4467660150238520666}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 355d18232d90f504788b426118bbb3fd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  energyAmount: 10
+  collectDistance: 0.2

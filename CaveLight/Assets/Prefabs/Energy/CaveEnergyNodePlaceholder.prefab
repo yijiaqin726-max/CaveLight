@@ -11,6 +11,7 @@ GameObject:
   - component: {fileID: 9011462630466804289}
   - component: {fileID: 4382427003800732177}
   - component: {fileID: 844536410205932039}
+  - component: {fileID: 3220264695715047871}
   m_Layer: 0
   m_Name: CaveEnergyNodePlaceholder
   m_TagString: Untagged
@@ -134,3 +135,22 @@ BoxCollider2D:
   m_AutoTiling: 0
   m_Size: {x: 1, y: 1}
   m_EdgeRadius: 0
+--- !u!114 &3220264695715047871
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2090875948905333381}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dbc7ada90a08f57468fd80b7e5b9b786, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  maxHealth: 3
+  currentHealth: 3
+  energyPrefab: {fileID: 4467660150238520666, guid: c513731b6d714ab47b933fadf01bedee, type: 3}
+  minDropCount: 3
+  maxDropCount: 5
+  dropRadius: 0.6
+  dropImpulse: 2
