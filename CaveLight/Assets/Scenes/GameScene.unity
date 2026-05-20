@@ -1034,6 +1034,10 @@ MonoBehaviour:
   caveEnergyNodePrefab: {fileID: 2090875948905333381, guid: 2bb04af91fa855646b1a39be3cde924e, type: 3}
   minCaveEnergyNodes: 2
   maxCaveEnergyNodes: 4
+  monsterPrefab: {fileID: 1412437213136660616, guid: c7ea07727dea01447a2c909ffeafe8b8, type: 3}
+  minMonsters: 1
+  maxMonsters: 3
+  killAmount: 0
   debugDrawSolidCells: 1
 --- !u!4 &553435335
 Transform:

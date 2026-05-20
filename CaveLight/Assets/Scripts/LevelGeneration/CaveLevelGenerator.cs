@@ -55,6 +55,12 @@ public class CaveLevelGenerator : MonoBehaviour
     public int minCaveEnergyNodes = 2;
     public int maxCaveEnergyNodes = 4;
 
+    [Header("Monsters")]
+    public GameObject monsterPrefab;
+    public int minMonsters = 1;
+    public int maxMonsters = 3;
+    public int killAmount = 0;
+
     [Header("Debug")]
     public bool debugDrawSolidCells = true;
 
@@ -162,6 +168,8 @@ public class CaveLevelGenerator : MonoBehaviour
         totalCavesCleared = Mathf.Max(0, totalCavesCleared);
         minCaveEnergyNodes = Mathf.Max(0, minCaveEnergyNodes);
         maxCaveEnergyNodes = Mathf.Max(minCaveEnergyNodes, maxCaveEnergyNodes);
+        minMonsters = Mathf.Max(0, minMonsters);
+        maxMonsters = Mathf.Max(minMonsters, maxMonsters);
         macroRows = 5;
         macroCols = 7;
         macroCellWidth = 8;
@@ -321,6 +329,7 @@ public class CaveLevelGenerator : MonoBehaviour
 
         PlacePlayer(spawnCell, new Vector3Int(spawnCell.x, spawnCell.y - 2, 0));
         SpawnCaveEnergyNodes(exitCell);
+        SpawnMonsters();
         SpawnExitOnStablePlatform(lastPlatform);
 
         int wallTileCount = CountWallTiles();
@@ -542,11 +551,6 @@ public class CaveLevelGenerator : MonoBehaviour
                 Debug.LogWarning($"[CaveLevelGenerator] Spawned cave energy node at {nodeCell} is missing CaveEnergyNode script.");
             }
 
-            if (node.GetComponent<BoxCollider2D>() == null)
-            {
-                Debug.LogWarning($"[CaveLevelGenerator] Spawned cave energy node at {nodeCell} is missing BoxCollider2D.");
-            }
-
             ConfigureSpawnedCaveEnergyNodeVisual(node, nodeCell);
             spawnedCount++;
         }
@@ -581,15 +585,113 @@ public class CaveLevelGenerator : MonoBehaviour
         }
 
         BoxCollider2D boxCollider = node.GetComponent<BoxCollider2D>();
-        if (boxCollider != null)
+        if (boxCollider == null)
         {
-            boxCollider.isTrigger = true;
-            boxCollider.size = Vector2.one;
-            boxCollider.offset = Vector2.zero;
+            boxCollider = node.AddComponent<BoxCollider2D>();
+        }
+
+        boxCollider.isTrigger = false;
+        boxCollider.size = new Vector2(0.8f, 0.8f);
+        boxCollider.offset = Vector2.zero;
+
+        if (node.GetComponent<CaveEnergyNode>() == null)
+        {
+            Debug.LogWarning($"[CaveLevelGenerator] Spawned cave energy node at {nodeCell} is missing CaveEnergyNode script.");
         }
 
         node.transform.localScale = Vector3.one;
-        Debug.Log($"[CaveLevelGenerator] Cave energy node generated at cell={nodeCell}, world={node.transform.position}, spriteRendererExists={spriteRenderer != null}, spriteRendererEnabled={(spriteRenderer != null && spriteRenderer.enabled)}, sortingOrder={(spriteRenderer != null ? spriteRenderer.sortingOrder : -1)}");
+        Debug.Log($"[CaveLevelGenerator] Cave energy node generated at cell={nodeCell}, world={node.transform.position}, spriteRendererExists={spriteRenderer != null}, spriteRendererEnabled={(spriteRenderer != null && spriteRenderer.enabled)}, sortingOrder={(spriteRenderer != null ? spriteRenderer.sortingOrder : -1)}, colliderIsTrigger={boxCollider.isTrigger}, colliderSize={boxCollider.size}");
+    }
+
+    private void SpawnMonsters()
+    {
+        if (monsterPrefab == null)
+        {
+            Debug.LogWarning("[CaveLevelGenerator] Monster prefab not assigned. Skipping monsters.");
+            return;
+        }
+
+        List<int> candidateIndices = new List<int>();
+        for (int i = 1; i < stableMainPlatforms.Count - 1; i++)
+        {
+            candidateIndices.Add(i);
+        }
+
+        Shuffle(candidateIndices);
+        int targetMonsterCount = Mathf.Clamp(Random.Range(minMonsters, maxMonsters + 1), 0, candidateIndices.Count);
+        int spawnedCount = 0;
+
+        for (int i = 0; i < candidateIndices.Count && spawnedCount < targetMonsterCount; i++)
+        {
+            StablePlatform platform = stableMainPlatforms[candidateIndices[i]];
+            Vector3Int monsterCell = new Vector3Int(platform.CenterX, platform.y + 1, 0);
+            Vector3 worldPos = wallTilemap.GetCellCenterWorld(monsterCell);
+
+            GameObject monster = Instantiate(monsterPrefab, worldPos, Quaternion.identity, levelObjectsRoot);
+            monster.name = "MonsterPlaceholder";
+            ConfigureSpawnedMonster(monster, monsterCell);
+
+            Debug.Log($"[CaveLevelGenerator] Monster spawned platform index={candidateIndices[i]}, cell={monsterCell}, world pos={worldPos}");
+            spawnedCount++;
+        }
+
+        Debug.Log($"[CaveLevelGenerator] Spawned {spawnedCount} monsters.");
+    }
+
+    private void ConfigureSpawnedMonster(GameObject monster, Vector3Int monsterCell)
+    {
+        SpriteRenderer spriteRenderer = monster.GetComponent<SpriteRenderer>();
+        if (spriteRenderer != null)
+        {
+            spriteRenderer.enabled = true;
+            spriteRenderer.sortingOrder = 25;
+            spriteRenderer.color = new Color(0.9f, 0.15f, 1f, 1f);
+        }
+        else
+        {
+            Debug.LogWarning($"[CaveLevelGenerator] Spawned monster at {monsterCell} is missing SpriteRenderer.");
+        }
+
+        Rigidbody2D rb = monster.GetComponent<Rigidbody2D>();
+        if (rb == null)
+        {
+            rb = monster.AddComponent<Rigidbody2D>();
+        }
+
+        rb.bodyType = RigidbodyType2D.Kinematic;
+        rb.gravityScale = 0f;
+        rb.freezeRotation = true;
+
+        BoxCollider2D boxCollider = monster.GetComponent<BoxCollider2D>();
+        if (boxCollider == null)
+        {
+            boxCollider = monster.AddComponent<BoxCollider2D>();
+        }
+
+        boxCollider.isTrigger = false;
+        boxCollider.size = Vector2.one;
+        boxCollider.offset = Vector2.zero;
+
+        if (monster.GetComponent<MonsterHealth>() == null)
+        {
+            Debug.LogWarning($"[CaveLevelGenerator] Spawned monster at {monsterCell} is missing MonsterHealth.");
+        }
+
+        if (monster.GetComponent<MonsterPatrol>() == null)
+        {
+            Debug.LogWarning($"[CaveLevelGenerator] Spawned monster at {monsterCell} is missing MonsterPatrol.");
+        }
+
+        if (monster.GetComponent<MonsterDamageDealer>() == null)
+        {
+            Debug.LogWarning($"[CaveLevelGenerator] Spawned monster at {monsterCell} is missing MonsterDamageDealer.");
+        }
+    }
+
+    public void AddKillCount(int amount)
+    {
+        killAmount += Mathf.Max(0, amount);
+        Debug.Log($"[CaveLevelGenerator] KillAmount: {killAmount}");
     }
 
     private int CountWallTiles()

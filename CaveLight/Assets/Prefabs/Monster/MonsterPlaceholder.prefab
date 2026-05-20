@@ -12,6 +12,9 @@ GameObject:
   - component: {fileID: 1792267293322861536}
   - component: {fileID: 218403955783868337}
   - component: {fileID: 8789248399163669086}
+  - component: {fileID: 6194203612778803101}
+  - component: {fileID: 6194203612778803102}
+  - component: {fileID: 6194203612778803103}
   m_Layer: 0
   m_Name: MonsterPlaceholder
   m_TagString: Untagged
@@ -77,9 +80,9 @@ SpriteRenderer:
   m_LightmapParameters: {fileID: 0}
   m_SortingLayerID: 0
   m_SortingLayer: 0
-  m_SortingOrder: 0
+  m_SortingOrder: 25
   m_Sprite: {fileID: 7036457109918019432, guid: b44f4d3f95212fa439f23b2f7b777a10, type: 3}
-  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_Color: {r: 0.9, g: 0.15, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
@@ -104,7 +107,7 @@ Rigidbody2D:
   m_Mass: 1
   m_LinearDamping: 0
   m_AngularDamping: 0.05
-  m_GravityScale: 1
+  m_GravityScale: 0
   m_Material: {fileID: 0}
   m_IncludeLayers:
     serializedVersion: 2
@@ -115,7 +118,7 @@ Rigidbody2D:
   m_Interpolate: 0
   m_SleepingMode: 1
   m_CollisionDetection: 0
-  m_Constraints: 0
+  m_Constraints: 4
 --- !u!61 &8789248399163669086
 BoxCollider2D:
   m_ObjectHideFlags: 0
@@ -162,3 +165,55 @@ BoxCollider2D:
   m_AutoTiling: 0
   m_Size: {x: 1, y: 1}
   m_EdgeRadius: 0
+--- !u!114 &6194203612778803101
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1412437213136660616}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7a12e78db8e34d6bb87c0890c541d101, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  maxHealth: 3
+  currentHealth: 3
+  energyPrefab: {fileID: 4467660150238520666, guid: c513731b6d714ab47b933fadf01bedee, type: 3}
+  dropCountMin: 2
+  dropCountMax: 4
+  dropRadius: 0.5
+  dropImpulse: 1.6
+--- !u!114 &6194203612778803102
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1412437213136660616}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 91d9f6a44a1d47bdb29cc895639f2202, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  moveSpeed: 2
+  patrolDistance: 3
+  groundLayer:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  wallCheckDistance: 0.35
+  ledgeCheckDistance: 1.2
+--- !u!114 &6194203612778803103
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1412437213136660616}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e1c923706751470a9e97f0a96055f2a5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  damageToEnergy: 10
+  damageCooldown: 1

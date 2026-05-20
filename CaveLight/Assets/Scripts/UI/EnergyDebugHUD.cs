@@ -6,6 +6,7 @@ public class EnergyDebugHUD : MonoBehaviour
     private PlayerEnergyStore playerEnergyStore;
     private CaveLevelGenerator caveLevelGenerator;
     private FieldInfo caveAmountField;
+    private FieldInfo killAmountField;
 
     void Awake()
     {
@@ -21,6 +22,7 @@ public class EnergyDebugHUD : MonoBehaviour
 
         GUI.Label(new Rect(10f, 10f, 240f, 24f), GetEnergyText());
         GUI.Label(new Rect(10f, 32f, 240f, 24f), GetCaveText());
+        GUI.Label(new Rect(10f, 54f, 240f, 24f), GetKillText());
     }
 
     private void FindReferences()
@@ -34,11 +36,17 @@ public class EnergyDebugHUD : MonoBehaviour
         {
             caveLevelGenerator = Object.FindFirstObjectByType<CaveLevelGenerator>();
             caveAmountField = null;
+            killAmountField = null;
         }
 
         if (caveLevelGenerator != null && caveAmountField == null)
         {
             caveAmountField = typeof(CaveLevelGenerator).GetField("caveAmount", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+        }
+
+        if (caveLevelGenerator != null && killAmountField == null)
+        {
+            killAmountField = typeof(CaveLevelGenerator).GetField("killAmount", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
         }
     }
 
@@ -61,5 +69,16 @@ public class EnergyDebugHUD : MonoBehaviour
 
         object value = caveAmountField.GetValue(caveLevelGenerator);
         return $"Cave: {value}";
+    }
+
+    private string GetKillText()
+    {
+        if (caveLevelGenerator == null || killAmountField == null)
+        {
+            return "Kill: --";
+        }
+
+        object value = killAmountField.GetValue(caveLevelGenerator);
+        return $"Kill: {value}";
     }
 }
