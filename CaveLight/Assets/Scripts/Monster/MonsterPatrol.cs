@@ -51,15 +51,35 @@ public class MonsterPatrol : MonoBehaviour
         }
 
         Vector2 origin = transform.position;
-        RaycastHit2D wallHit = Physics2D.Raycast(origin, Vector2.right * direction, wallCheckDistance, groundLayer);
-        if (wallHit.collider != null && wallHit.collider != ownCollider && !wallHit.collider.isTrigger)
+        if (HasSolidRayHit(origin, Vector2.right * direction, wallCheckDistance))
         {
             return true;
         }
 
         Vector2 groundCheckOrigin = origin + new Vector2(direction * 0.55f, -0.55f);
-        RaycastHit2D groundHit = Physics2D.Raycast(groundCheckOrigin, Vector2.down, ledgeCheckDistance, groundLayer);
-        return groundHit.collider == null;
+        return !HasSolidRayHit(groundCheckOrigin, Vector2.down, ledgeCheckDistance);
+    }
+
+    private bool HasSolidRayHit(Vector2 origin, Vector2 direction, float distance)
+    {
+        RaycastHit2D[] hits = Physics2D.RaycastAll(origin, direction, distance, groundLayer);
+        for (int i = 0; i < hits.Length; i++)
+        {
+            Collider2D hitCollider = hits[i].collider;
+            if (hitCollider == null || hitCollider == ownCollider || hitCollider.isTrigger)
+            {
+                continue;
+            }
+
+            if (hitCollider.attachedRigidbody == rb)
+            {
+                continue;
+            }
+
+            return true;
+        }
+
+        return false;
     }
 
     void OnDrawGizmosSelected()

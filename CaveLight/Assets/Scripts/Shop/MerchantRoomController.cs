@@ -1,12 +1,17 @@
-using UnityEngine;
-using UnityEngine.UI;
+using System;
+using System.Collections.Generic;
 using TMPro;
+using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.UI;
 
 public class MerchantRoomController : MonoBehaviour
 {
     [Header("Player")]
     public PlayerEnergyStore playerEnergyStore;
+    public PlayerAttack playerAttack;
     public EnergyAbsorbController energyAbsorbController;
+    public PlayerLightController playerLightController;
 
     [Header("Item Buttons")]
     public Button itemButton1;
@@ -25,41 +30,67 @@ public class MerchantRoomController : MonoBehaviour
     public Text energyText;
     public TMP_Text energyTmpText;
 
+    [Header("Dialogue")]
+    public Text dialogueText;
+    public TMP_Text dialogueTmpText;
+    public GameObject dialogueBox;
+
     [Header("Navigation")]
     public Button enterNextCaveButton;
 
-    private bool backpackPurchased;
-    private bool slowBurnPurchased;
-    private bool biggerAbsorbPurchased;
+    private readonly List<ShopItem> itemPool = new List<ShopItem>();
+    private readonly ShopItem[] currentItems = new ShopItem[3];
+    private readonly bool[] purchased = new bool[3];
+    private readonly Text[] nameTexts = new Text[3];
+    private readonly Text[] costTexts = new Text[3];
+    private readonly Text[] descriptionTexts = new Text[3];
+    private readonly Text[] buyTexts = new Text[3];
+    private Button[] itemButtons;
+    private Coroutine dialogueCoroutine;
     private Sprite generatedCircleSprite;
 
-    private const float BackpackCost = 30f;
-    private const float SlowBurnCost = 25f;
-    private const float BiggerAbsorbCost = 20f;
+    private class ShopItem
+    {
+        public string Name;
+        public int Cost;
+        public string Description;
+        public Action Apply;
+
+        public ShopItem(string name, int cost, string description, Action apply)
+        {
+            Name = name;
+            Cost = cost;
+            Description = description;
+            Apply = apply;
+        }
+    }
 
     void Awake()
     {
         FindReferences();
+        BuildItemPool();
         ConfigureMerchantRoomLayout();
         BindButtons();
     }
 
     void OnEnable()
     {
+        Cursor.visible = true;
         FindReferences();
         ConfigureMerchantRoomLayout();
-        RefreshButtons();
+        RefreshEnergyText();
     }
 
     public void OnEnterMerchantRoom()
     {
-        backpackPurchased = false;
-        slowBurnPurchased = false;
-        biggerAbsorbPurchased = false;
+        Cursor.visible = true;
         FindReferences();
+        BuildItemPool();
         ConfigureMerchantRoomLayout();
+        RollShopItems();
         BindButtons();
-        RefreshButtons();
+        RefreshShopUi();
+        ShowDialogue("需要用能源来交换商品。", 2f);
     }
 
     private void FindReferences()
@@ -69,187 +100,63 @@ public class MerchantRoomController : MonoBehaviour
             playerEnergyStore = FindFirstObjectByType<PlayerEnergyStore>();
         }
 
+        if (playerAttack == null)
+        {
+            playerAttack = FindFirstObjectByType<PlayerAttack>();
+        }
+
         if (energyAbsorbController == null)
         {
             energyAbsorbController = FindFirstObjectByType<EnergyAbsorbController>();
         }
 
-        AutoFindUiReferences();
+        if (playerLightController == null)
+        {
+            playerLightController = FindFirstObjectByType<PlayerLightController>();
+        }
+    }
+
+    private void BuildItemPool()
+    {
+        itemPool.Clear();
+        itemPool.Add(new ShopItem("蓄能背包", 30, "最大能源 +20，并立即恢复 20 点能源。", ApplyEnergyBackpack));
+        itemPool.Add(new ShopItem("锋利矿镐", 25, "攻击力 +1。", ApplySharpPickaxe));
+        itemPool.Add(new ShopItem("稳定灯芯", 25, "能源消耗速度降低 20%。", ApplyStableWick));
+        itemPool.Add(new ShopItem("广域磁吸", 20, "能源吸收范围 +1。", ApplyWideMagnet));
+        itemPool.Add(new ShopItem("照明水晶", 25, "照明范围 +1。真实光照系统完成后生效。", ApplyLightCrystal));
+    }
+
+    private void RollShopItems()
+    {
+        List<ShopItem> available = new List<ShopItem>(itemPool);
+        for (int i = 0; i < currentItems.Length; i++)
+        {
+            int index = UnityEngine.Random.Range(0, available.Count);
+            currentItems[i] = available[index];
+            available.RemoveAt(index);
+            purchased[i] = false;
+        }
     }
 
     private void BindButtons()
     {
-        if (itemButton1 != null)
+        itemButtons = new[] { itemButton1, itemButton2, itemButton3 };
+        for (int i = 0; i < itemButtons.Length; i++)
         {
-            itemButton1.onClick.RemoveListener(BuyEnergyBackpack);
-            itemButton1.onClick.AddListener(BuyEnergyBackpack);
+            int itemIndex = i;
+            if (itemButtons[i] == null)
+            {
+                continue;
+            }
+
+            itemButtons[i].onClick.RemoveAllListeners();
+            itemButtons[i].onClick.AddListener(() => TryBuyItem(itemIndex));
         }
 
-        if (itemButton2 != null)
-        {
-            itemButton2.onClick.RemoveListener(BuySlowBurn);
-            itemButton2.onClick.AddListener(BuySlowBurn);
-        }
-
-        if (itemButton3 != null)
-        {
-            itemButton3.onClick.RemoveListener(BuyBiggerAbsorb);
-            itemButton3.onClick.AddListener(BuyBiggerAbsorb);
-        }
-
-        BindEnterNextCaveButton();
+        BindLeaveButton();
     }
 
-    private void BuyEnergyBackpack()
-    {
-        if (backpackPurchased)
-        {
-            return;
-        }
-
-        if (!TrySpendEnergy(BackpackCost, "Energy Backpack", itemText1, itemTmpText1))
-        {
-            return;
-        }
-
-        playerEnergyStore.maxEnergy += 20f;
-        playerEnergyStore.AddEnergy(20f);
-        backpackPurchased = true;
-        Debug.Log("[MerchantRoomController] Purchased Energy Backpack.");
-        RefreshButtons();
-    }
-
-    private void BuySlowBurn()
-    {
-        if (slowBurnPurchased)
-        {
-            return;
-        }
-
-        if (!TrySpendEnergy(SlowBurnCost, "Slow Burn", itemText2, itemTmpText2))
-        {
-            return;
-        }
-
-        playerEnergyStore.drainPerSecond *= 0.8f;
-        slowBurnPurchased = true;
-        Debug.Log("[MerchantRoomController] Purchased Slow Burn.");
-        RefreshButtons();
-    }
-
-    private void BuyBiggerAbsorb()
-    {
-        if (biggerAbsorbPurchased)
-        {
-            return;
-        }
-
-        if (!TrySpendEnergy(BiggerAbsorbCost, "Bigger Absorb", itemText3, itemTmpText3))
-        {
-            return;
-        }
-
-        if (energyAbsorbController != null)
-        {
-            energyAbsorbController.absorbRadius += 1f;
-        }
-
-        biggerAbsorbPurchased = true;
-        Debug.Log("[MerchantRoomController] Purchased Bigger Absorb.");
-        RefreshButtons();
-    }
-
-    private bool TrySpendEnergy(float cost, string itemName, Text buttonText, TMP_Text buttonTmpText)
-    {
-        FindReferences();
-
-        if (playerEnergyStore == null || playerEnergyStore.currentEnergy < cost)
-        {
-            SetButtonLabel(buttonText, buttonTmpText, "Not Enough Energy");
-            Debug.Log($"[MerchantRoomController] Not enough Energy for {itemName}.");
-            return false;
-        }
-
-        playerEnergyStore.ConsumeEnergy(cost);
-        return true;
-    }
-
-    private void RefreshButtons()
-    {
-        SetItemState(itemButton1, itemText1, itemTmpText1, backpackPurchased);
-        SetItemState(itemButton2, itemText2, itemTmpText2, slowBurnPurchased);
-        SetItemState(itemButton3, itemText3, itemTmpText3, biggerAbsorbPurchased);
-        RefreshEnergyText();
-    }
-
-    private void SetItemState(Button button, Text text, TMP_Text tmpText, bool purchased)
-    {
-        if (button != null)
-        {
-            button.interactable = !purchased;
-        }
-
-        SetButtonLabel(text, tmpText, purchased ? "Purchased" : "Buy");
-    }
-
-    private void SetButtonLabel(Text text, TMP_Text tmpText, string value)
-    {
-        if (text != null)
-        {
-            text.text = value;
-        }
-
-        if (tmpText != null)
-        {
-            tmpText.text = value;
-        }
-    }
-
-    private void RefreshEnergyText()
-    {
-        string value = playerEnergyStore != null
-            ? $"Energy: {playerEnergyStore.currentEnergy:0} / {playerEnergyStore.maxEnergy:0}"
-            : "Energy: -- / --";
-
-        if (energyText != null)
-        {
-            energyText.text = value;
-        }
-
-        if (energyTmpText != null)
-        {
-            energyTmpText.text = value;
-        }
-    }
-
-    private void AutoFindUiReferences()
-    {
-        if (itemButton1 == null)
-        {
-            itemButton1 = FindButtonInChildren("BuyButton_EnergyBackpack");
-        }
-
-        if (itemButton2 == null)
-        {
-            itemButton2 = FindButtonInChildren("BuyButton_SlowBurn");
-        }
-
-        if (itemButton3 == null)
-        {
-            itemButton3 = FindButtonInChildren("BuyButton_BiggerAbsorb");
-        }
-
-        if (enterNextCaveButton == null)
-        {
-            enterNextCaveButton = FindButtonInChildren("EnterNextCaveButton");
-        }
-
-        AutoFindTextReferences(itemButton1, ref itemText1, ref itemTmpText1);
-        AutoFindTextReferences(itemButton2, ref itemText2, ref itemTmpText2);
-        AutoFindTextReferences(itemButton3, ref itemText3, ref itemTmpText3);
-    }
-
-    private void BindEnterNextCaveButton()
+    private void BindLeaveButton()
     {
         if (enterNextCaveButton == null)
         {
@@ -270,36 +177,136 @@ public class MerchantRoomController : MonoBehaviour
         enterNextCaveButton.onClick.AddListener(generator.ExitMerchantRoom);
     }
 
-    private Button FindButtonInChildren(string objectName)
+    private void TryBuyItem(int index)
     {
-        Button[] buttons = GetComponentsInChildren<Button>(true);
-        for (int i = 0; i < buttons.Length; i++)
-        {
-            if (buttons[i].name == objectName)
-            {
-                return buttons[i];
-            }
-        }
-
-        return null;
-    }
-
-    private void AutoFindTextReferences(Button button, ref Text text, ref TMP_Text tmpText)
-    {
-        if (button == null)
+        if (index < 0 || index >= currentItems.Length || currentItems[index] == null || purchased[index])
         {
             return;
         }
 
-        if (text == null)
+        FindReferences();
+        ShopItem item = currentItems[index];
+        if (playerEnergyStore == null || playerEnergyStore.currentEnergy < item.Cost)
         {
-            text = button.GetComponentInChildren<Text>(true);
+            ShowDialogue("能源不够。", 2f);
+            Debug.Log($"[MerchantRoomController] 能源不够：{item.Name}");
+            return;
         }
 
-        if (tmpText == null)
+        playerEnergyStore.ConsumeEnergy(item.Cost);
+        item.Apply?.Invoke();
+        purchased[index] = true;
+        ShowDialogue($"已购买：{item.Name}", 1.5f);
+        Debug.Log($"[MerchantRoomController] 已购买：{item.Name}");
+        RefreshShopUi();
+    }
+
+    private void ApplyEnergyBackpack()
+    {
+        if (playerEnergyStore == null)
         {
-            tmpText = button.GetComponentInChildren<TMP_Text>(true);
+            return;
         }
+
+        playerEnergyStore.maxEnergy += 20f;
+        playerEnergyStore.AddEnergy(20f);
+    }
+
+    private void ApplySharpPickaxe()
+    {
+        if (playerAttack != null)
+        {
+            playerAttack.attackDamage += 1f;
+        }
+    }
+
+    private void ApplyStableWick()
+    {
+        if (playerEnergyStore != null)
+        {
+            playerEnergyStore.drainPerSecond *= 0.8f;
+        }
+    }
+
+    private void ApplyWideMagnet()
+    {
+        if (energyAbsorbController != null)
+        {
+            energyAbsorbController.absorbRadius += 1f;
+        }
+    }
+
+    private void ApplyLightCrystal()
+    {
+        if (playerLightController != null && playerLightController.enabled)
+        {
+            playerLightController.maxOuterRadius += 1f;
+            return;
+        }
+
+        Debug.Log("照明范围升级已购买，等待真实光照系统接入。");
+    }
+
+    private void RefreshShopUi()
+    {
+        RefreshEnergyText();
+
+        for (int i = 0; i < currentItems.Length; i++)
+        {
+            ShopItem item = currentItems[i];
+            if (item == null)
+            {
+                continue;
+            }
+
+            SetText(nameTexts[i], item.Name);
+            SetText(costTexts[i], $"消耗能源：{item.Cost}");
+            SetText(descriptionTexts[i], item.Description);
+            SetText(buyTexts[i], purchased[i] ? "已购买" : "购买");
+
+            if (itemButtons != null && i < itemButtons.Length && itemButtons[i] != null)
+            {
+                itemButtons[i].interactable = !purchased[i];
+            }
+        }
+    }
+
+    private void RefreshEnergyText()
+    {
+        string value = playerEnergyStore != null
+            ? $"当前能源：{playerEnergyStore.currentEnergy:0} / {playerEnergyStore.maxEnergy:0}"
+            : "当前能源：-- / --";
+
+        SetText(energyText, value);
+        SetText(energyTmpText, value);
+    }
+
+    private void ShowDialogue(string message, float duration)
+    {
+        if (dialogueBox != null)
+        {
+            dialogueBox.SetActive(true);
+        }
+
+        SetText(dialogueText, message);
+        SetText(dialogueTmpText, message);
+
+        if (dialogueCoroutine != null)
+        {
+            StopCoroutine(dialogueCoroutine);
+        }
+
+        dialogueCoroutine = StartCoroutine(HideDialogueAfterDelay(duration));
+    }
+
+    private System.Collections.IEnumerator HideDialogueAfterDelay(float delay)
+    {
+        yield return new WaitForSecondsRealtime(delay);
+        if (dialogueBox != null)
+        {
+            dialogueBox.SetActive(false);
+        }
+        dialogueCoroutine = null;
     }
 
     private void ConfigureMerchantRoomLayout()
@@ -315,33 +322,35 @@ public class MerchantRoomController : MonoBehaviour
 
         RectTransform backgroundOverlay = GetOrCreateChildRect("BackgroundOverlay", transform);
         ConfigureFullRect(backgroundOverlay, Vector2.zero, Vector2.zero);
-        SetImageColor(backgroundOverlay.gameObject, new Color(0.015f, 0.018f, 0.025f, 0.78f));
+        SetImageColor(backgroundOverlay.gameObject, new Color(0.02f, 0.018f, 0.025f, 0.82f));
         backgroundOverlay.SetAsFirstSibling();
 
         RectTransform shopFrame = GetOrCreateChildRect("ShopFrame", transform);
+        ClearChildren(shopFrame);
         ConfigureShopFrame(shopFrame);
 
-        Text title = GetOrCreateText("TitleText", shopFrame, "Merchant Room", 42, TextAnchor.MiddleCenter);
-        ConfigureAnchoredRect(title.rectTransform, new Vector2(0.28f, 0.88f), new Vector2(0.72f, 0.98f), Vector2.zero, Vector2.zero);
+        Text title = GetOrCreateText("TitleText", shopFrame, "商人房", 42, TextAnchor.MiddleCenter);
+        ConfigureAnchoredRect(title.rectTransform, new Vector2(0.30f, 0.88f), new Vector2(0.70f, 0.98f), Vector2.zero, Vector2.zero);
 
         energyText = GetOrCreateText("EnergyText", shopFrame, "", 26, TextAnchor.MiddleRight);
-        ConfigureAnchoredRect(energyText.rectTransform, new Vector2(0.70f, 0.88f), new Vector2(0.96f, 0.98f), Vector2.zero, Vector2.zero);
+        ConfigureAnchoredRect(energyText.rectTransform, new Vector2(0.66f, 0.88f), new Vector2(0.96f, 0.98f), Vector2.zero, Vector2.zero);
 
-        RectTransform merchantArea = GetOrCreateChildRect("MerchantArea", shopFrame);
-        ConfigureAnchoredRect(merchantArea, new Vector2(0.04f, 0.14f), new Vector2(0.28f, 0.84f), Vector2.zero, Vector2.zero);
-        SetImageColor(merchantArea.gameObject, new Color(0.08f, 0.085f, 0.095f, 0.88f));
+        dialogueBox = GetOrCreateChildRect("DialogueBox", shopFrame).gameObject;
+        ConfigureAnchoredRect((RectTransform)dialogueBox.transform, new Vector2(0.06f, 0.72f), new Vector2(0.94f, 0.86f), Vector2.zero, Vector2.zero);
+        SetImageColor(dialogueBox, new Color(0.06f, 0.065f, 0.075f, 0.96f));
 
-        ConfigureMerchantArea(merchantArea);
+        dialogueText = GetOrCreateText("DialogueText", dialogueBox.transform, "需要用能源来交换商品。", 26, TextAnchor.MiddleCenter);
+        ConfigureFullRect(dialogueText.rectTransform, new Vector2(20f, 10f), new Vector2(-20f, -10f));
 
         RectTransform goodsContainer = GetOrCreateChildRect("GoodsContainer", shopFrame);
         ConfigureGoodsContainer(goodsContainer);
 
-        itemButton1 = EnsureItemCard(goodsContainer, "ItemCard_EnergyBackpack", "BuyButton_EnergyBackpack", "Energy Backpack", "Cost: 30 Energy", "Max Energy +20", out itemText1, out itemTmpText1);
-        itemButton2 = EnsureItemCard(goodsContainer, "ItemCard_SlowBurn", "BuyButton_SlowBurn", "Slow Burn", "Cost: 25 Energy", "Drain -20%", out itemText2, out itemTmpText2);
-        itemButton3 = EnsureItemCard(goodsContainer, "ItemCard_BiggerAbsorb", "BuyButton_BiggerAbsorb", "Bigger Absorb", "Cost: 20 Energy", "Absorb Radius +1", out itemText3, out itemTmpText3);
+        itemButton1 = EnsureItemCard(goodsContainer, 0);
+        itemButton2 = EnsureItemCard(goodsContainer, 1);
+        itemButton3 = EnsureItemCard(goodsContainer, 2);
+        itemButtons = new[] { itemButton1, itemButton2, itemButton3 };
 
         enterNextCaveButton = EnsureLeaveButton(shopFrame);
-        RefreshEnergyText();
     }
 
     private void ConfigureCanvasScaler(RectTransform panelRect)
@@ -369,7 +378,6 @@ public class MerchantRoomController : MonoBehaviour
         panelRect.anchorMax = Vector2.one;
         panelRect.offsetMin = Vector2.zero;
         panelRect.offsetMax = Vector2.zero;
-        panelRect.pivot = new Vector2(0.5f, 0.5f);
 
         Image image = GetComponent<Image>();
         if (image != null)
@@ -380,31 +388,13 @@ public class MerchantRoomController : MonoBehaviour
 
     private void ConfigureShopFrame(RectTransform shopFrame)
     {
-        ConfigureAnchoredRect(shopFrame, new Vector2(0.10f, 0.125f), new Vector2(0.90f, 0.875f), Vector2.zero, Vector2.zero);
-        SetImageColor(shopFrame.gameObject, new Color(0.10f, 0.12f, 0.15f, 0.96f));
-    }
-
-    private void ConfigureMerchantArea(RectTransform merchantArea)
-    {
-        RectTransform silhouette = GetOrCreateChildRect("MerchantSilhouette", merchantArea);
-        ConfigureAnchoredRect(silhouette, new Vector2(0.16f, 0.34f), new Vector2(0.84f, 0.92f), Vector2.zero, Vector2.zero);
-
-        RectTransform head = GetOrCreateChildRect("Head", silhouette);
-        ConfigureAnchoredRect(head, new Vector2(0.32f, 0.58f), new Vector2(0.68f, 0.92f), Vector2.zero, Vector2.zero);
-        Image headImage = SetImageColor(head.gameObject, new Color(0.02f, 0.022f, 0.026f, 1f));
-        headImage.sprite = GetCircleSprite();
-
-        RectTransform body = GetOrCreateChildRect("Body", silhouette);
-        ConfigureAnchoredRect(body, new Vector2(0.22f, 0.08f), new Vector2(0.78f, 0.62f), Vector2.zero, Vector2.zero);
-        SetImageColor(body.gameObject, new Color(0.025f, 0.027f, 0.032f, 1f));
-
-        Text dialogue = GetOrCreateText("MerchantDialogueText", merchantArea, "Spend your remaining energy wisely.", 22, TextAnchor.MiddleCenter);
-        ConfigureAnchoredRect(dialogue.rectTransform, new Vector2(0.08f, 0.06f), new Vector2(0.92f, 0.28f), Vector2.zero, Vector2.zero);
+        ConfigureAnchoredRect(shopFrame, new Vector2(0.10f, 0.12f), new Vector2(0.90f, 0.88f), Vector2.zero, Vector2.zero);
+        SetImageColor(shopFrame.gameObject, new Color(0.10f, 0.11f, 0.13f, 0.97f));
     }
 
     private void ConfigureGoodsContainer(RectTransform goodsContainer)
     {
-        ConfigureAnchoredRect(goodsContainer, new Vector2(0.32f, 0.20f), new Vector2(0.96f, 0.82f), Vector2.zero, Vector2.zero);
+        ConfigureAnchoredRect(goodsContainer, new Vector2(0.06f, 0.20f), new Vector2(0.94f, 0.68f), Vector2.zero, Vector2.zero);
 
         HorizontalLayoutGroup layout = goodsContainer.GetComponent<HorizontalLayoutGroup>();
         if (layout == null)
@@ -413,62 +403,47 @@ public class MerchantRoomController : MonoBehaviour
         }
 
         layout.childAlignment = TextAnchor.MiddleCenter;
-        layout.spacing = 24f;
-        layout.padding = new RectOffset(0, 0, 0, 0);
+        layout.spacing = 26f;
         layout.childControlWidth = true;
         layout.childControlHeight = true;
         layout.childForceExpandWidth = true;
         layout.childForceExpandHeight = true;
     }
 
-    private Button EnsureItemCard(RectTransform parent, string cardName, string buyButtonName, string itemName, string cost, string description, out Text buyText, out TMP_Text buyTmpText)
+    private Button EnsureItemCard(RectTransform parent, int index)
     {
-        RectTransform card = GetOrCreateChildRect(cardName, parent);
-        SetImageColor(card.gameObject, new Color(0.145f, 0.15f, 0.165f, 0.98f));
+        RectTransform card = GetOrCreateChildRect($"ItemCard_{index + 1}", parent);
+        SetImageColor(card.gameObject, new Color(0.15f, 0.155f, 0.17f, 1f));
+        EnsureLayoutElement(card.gameObject, 310f, 360f);
 
-        LayoutElement cardLayout = card.GetComponent<LayoutElement>();
-        if (cardLayout == null)
+        VerticalLayoutGroup layout = card.GetComponent<VerticalLayoutGroup>();
+        if (layout == null)
         {
-            cardLayout = card.gameObject.AddComponent<LayoutElement>();
+            layout = card.gameObject.AddComponent<VerticalLayoutGroup>();
         }
-        cardLayout.minWidth = 250f;
-        cardLayout.preferredWidth = 310f;
-        cardLayout.minHeight = 360f;
-        cardLayout.preferredHeight = 430f;
 
-        VerticalLayoutGroup cardVertical = card.GetComponent<VerticalLayoutGroup>();
-        if (cardVertical == null)
-        {
-            cardVertical = card.gameObject.AddComponent<VerticalLayoutGroup>();
-        }
-        cardVertical.padding = new RectOffset(22, 22, 22, 22);
-        cardVertical.spacing = 14f;
-        cardVertical.childAlignment = TextAnchor.UpperCenter;
-        cardVertical.childControlWidth = true;
-        cardVertical.childControlHeight = true;
-        cardVertical.childForceExpandWidth = true;
-        cardVertical.childForceExpandHeight = false;
+        layout.padding = new RectOffset(22, 22, 22, 22);
+        layout.spacing = 12f;
+        layout.childAlignment = TextAnchor.UpperCenter;
+        layout.childControlWidth = true;
+        layout.childControlHeight = true;
+        layout.childForceExpandWidth = true;
+        layout.childForceExpandHeight = false;
 
-        Text nameText = GetOrCreateText("ItemNameText", card, itemName, 28, TextAnchor.MiddleCenter);
-        SetPreferredHeight(nameText.gameObject, 64f);
+        nameTexts[index] = GetOrCreateText("ItemNameText", card, "商品", 30, TextAnchor.MiddleCenter);
+        EnsureLayoutElement(nameTexts[index].gameObject, 0f, 58f);
 
-        Text costText = GetOrCreateText("ItemCostText", card, cost, 22, TextAnchor.MiddleCenter);
-        costText.color = new Color(1f, 0.86f, 0.36f, 1f);
-        SetPreferredHeight(costText.gameObject, 44f);
+        costTexts[index] = GetOrCreateText("ItemCostText", card, "消耗能源：--", 24, TextAnchor.MiddleCenter);
+        costTexts[index].color = new Color(1f, 0.86f, 0.36f, 1f);
+        EnsureLayoutElement(costTexts[index].gameObject, 0f, 44f);
 
-        Text descriptionText = GetOrCreateText("ItemDescriptionText", card, description, 22, TextAnchor.MiddleCenter);
-        SetPreferredHeight(descriptionText.gameObject, 150f);
+        descriptionTexts[index] = GetOrCreateText("ItemDescriptionText", card, "描述", 22, TextAnchor.MiddleCenter);
+        EnsureLayoutElement(descriptionTexts[index].gameObject, 0f, 126f);
 
-        Button buyButton = EnsureCardBuyButton(card, buyButtonName, out buyText, out buyTmpText);
-        return buyButton;
-    }
+        RectTransform buttonRect = GetOrCreateChildRect("BuyButton", card);
+        EnsureLayoutElement(buttonRect.gameObject, 0f, 58f);
+        Image image = SetImageColor(buttonRect.gameObject, new Color(0.34f, 0.30f, 0.20f, 1f));
 
-    private Button EnsureCardBuyButton(RectTransform card, string buttonName, out Text buyText, out TMP_Text buyTmpText)
-    {
-        RectTransform buttonRect = GetOrCreateChildRect(buttonName, card);
-        SetPreferredHeight(buttonRect.gameObject, 58f);
-
-        Image image = SetImageColor(buttonRect.gameObject, new Color(0.34f, 0.30f, 0.22f, 1f));
         Button button = buttonRect.GetComponent<Button>();
         if (button == null)
         {
@@ -476,16 +451,37 @@ public class MerchantRoomController : MonoBehaviour
         }
         button.targetGraphic = image;
 
-        buyText = GetOrCreateText("Text", buttonRect, "Buy", 24, TextAnchor.MiddleCenter);
-        ConfigureFullRect(buyText.rectTransform, Vector2.zero, Vector2.zero);
-        buyTmpText = buttonRect.GetComponentInChildren<TMP_Text>(true);
+        buyTexts[index] = GetOrCreateText("Text", buttonRect, "购买", 24, TextAnchor.MiddleCenter);
+        ConfigureFullRect(buyTexts[index].rectTransform, Vector2.zero, Vector2.zero);
+
+        ConfigureHover(card.gameObject, index);
         return button;
+    }
+
+    private void ConfigureHover(GameObject card, int index)
+    {
+        EventTrigger trigger = card.GetComponent<EventTrigger>();
+        if (trigger == null)
+        {
+            trigger = card.AddComponent<EventTrigger>();
+        }
+
+        trigger.triggers.Clear();
+        EventTrigger.Entry enter = new EventTrigger.Entry { eventID = EventTriggerType.PointerEnter };
+        enter.callback.AddListener(_ =>
+        {
+            if (currentItems[index] != null)
+            {
+                ShowDialogue(currentItems[index].Description, 2f);
+            }
+        });
+        trigger.triggers.Add(enter);
     }
 
     private Button EnsureLeaveButton(RectTransform shopFrame)
     {
         RectTransform buttonRect = GetOrCreateChildRect("EnterNextCaveButton", shopFrame);
-        ConfigureAnchoredRect(buttonRect, new Vector2(0.74f, 0.06f), new Vector2(0.96f, 0.15f), Vector2.zero, Vector2.zero);
+        ConfigureAnchoredRect(buttonRect, new Vector2(0.78f, 0.06f), new Vector2(0.96f, 0.15f), Vector2.zero, Vector2.zero);
 
         Image image = SetImageColor(buttonRect.gameObject, new Color(0.22f, 0.28f, 0.34f, 1f));
         Button button = buttonRect.GetComponent<Button>();
@@ -495,7 +491,7 @@ public class MerchantRoomController : MonoBehaviour
         }
         button.targetGraphic = image;
 
-        Text text = GetOrCreateText("Text", buttonRect, "Leave Shop", 24, TextAnchor.MiddleCenter);
+        Text text = GetOrCreateText("Text", buttonRect, "离开", 26, TextAnchor.MiddleCenter);
         ConfigureFullRect(text.rectTransform, Vector2.zero, Vector2.zero);
         return button;
     }
@@ -503,21 +499,16 @@ public class MerchantRoomController : MonoBehaviour
     private Text GetOrCreateText(string objectName, Transform parent, string content, int fontSize, TextAnchor alignment)
     {
         Transform existing = parent.Find(objectName);
-        Text text = existing != null ? existing.GetComponent<Text>() : null;
+        GameObject textObject = existing != null ? existing.gameObject : new GameObject(objectName, typeof(RectTransform));
+        if (existing == null)
+        {
+            textObject.transform.SetParent(parent, false);
+        }
 
+        Text text = textObject.GetComponent<Text>();
         if (text == null)
         {
-            GameObject textObject = existing != null ? existing.gameObject : new GameObject(objectName, typeof(RectTransform));
-            if (existing == null)
-            {
-                textObject.transform.SetParent(parent, false);
-            }
-
-            text = textObject.GetComponent<Text>();
-            if (text == null)
-            {
-                text = textObject.AddComponent<Text>();
-            }
+            text = textObject.AddComponent<Text>();
         }
 
         text.text = content;
@@ -535,12 +526,33 @@ public class MerchantRoomController : MonoBehaviour
         Transform existing = parent.Find(objectName);
         if (existing != null)
         {
-            return existing.GetComponent<RectTransform>();
+            RectTransform existingRect = existing.GetComponent<RectTransform>();
+            if (existingRect != null)
+            {
+                return existingRect;
+            }
         }
 
         GameObject child = new GameObject(objectName, typeof(RectTransform));
         child.transform.SetParent(parent, false);
         return child.GetComponent<RectTransform>();
+    }
+
+    private void ClearChildren(Transform parent)
+    {
+        for (int i = parent.childCount - 1; i >= 0; i--)
+        {
+            Transform child = parent.GetChild(i);
+            if (Application.isPlaying)
+            {
+                child.SetParent(null, false);
+                Destroy(child.gameObject);
+            }
+            else
+            {
+                DestroyImmediate(child.gameObject);
+            }
+        }
     }
 
     private Image SetImageColor(GameObject target, Color color)
@@ -555,7 +567,7 @@ public class MerchantRoomController : MonoBehaviour
         return image;
     }
 
-    private void SetPreferredHeight(GameObject target, float height)
+    private void EnsureLayoutElement(GameObject target, float preferredWidth, float preferredHeight)
     {
         LayoutElement layoutElement = target.GetComponent<LayoutElement>();
         if (layoutElement == null)
@@ -563,7 +575,15 @@ public class MerchantRoomController : MonoBehaviour
             layoutElement = target.AddComponent<LayoutElement>();
         }
 
-        layoutElement.preferredHeight = height;
+        if (preferredWidth > 0f)
+        {
+            layoutElement.preferredWidth = preferredWidth;
+        }
+
+        if (preferredHeight > 0f)
+        {
+            layoutElement.preferredHeight = preferredHeight;
+        }
     }
 
     private void ConfigureAnchoredRect(RectTransform rect, Vector2 anchorMin, Vector2 anchorMax, Vector2 offsetMin, Vector2 offsetMax)
@@ -579,30 +599,19 @@ public class MerchantRoomController : MonoBehaviour
         ConfigureAnchoredRect(rect, Vector2.zero, Vector2.one, offsetMin, offsetMax);
     }
 
-    private Sprite GetCircleSprite()
+    private void SetText(Text text, string value)
     {
-        if (generatedCircleSprite != null)
+        if (text != null)
         {
-            return generatedCircleSprite;
+            text.text = value;
         }
+    }
 
-        const int textureSize = 64;
-        Texture2D texture = new Texture2D(textureSize, textureSize, TextureFormat.RGBA32, false);
-        Vector2 center = new Vector2((textureSize - 1) * 0.5f, (textureSize - 1) * 0.5f);
-        float radius = textureSize * 0.48f;
-
-        for (int y = 0; y < textureSize; y++)
+    private void SetText(TMP_Text text, string value)
+    {
+        if (text != null)
         {
-            for (int x = 0; x < textureSize; x++)
-            {
-                float distance = Vector2.Distance(new Vector2(x, y), center);
-                float alpha = distance <= radius ? 1f : 0f;
-                texture.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
-            }
+            text.text = value;
         }
-
-        texture.Apply();
-        generatedCircleSprite = Sprite.Create(texture, new Rect(0f, 0f, textureSize, textureSize), new Vector2(0.5f, 0.5f), textureSize);
-        return generatedCircleSprite;
     }
 }

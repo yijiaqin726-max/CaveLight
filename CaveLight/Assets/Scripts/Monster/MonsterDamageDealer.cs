@@ -7,9 +7,15 @@ public class MonsterDamageDealer : MonoBehaviour
 
     private float nextDamageTime;
 
-    void OnCollisionStay2D(Collision2D collision)
+    void OnValidate()
     {
-        TryDamagePlayer(collision.collider);
+        damageToEnergy = Mathf.Max(0f, damageToEnergy);
+        damageCooldown = Mathf.Max(0.05f, damageCooldown);
+    }
+
+    void OnTriggerEnter2D(Collider2D other)
+    {
+        TryDamagePlayer(other);
     }
 
     void OnTriggerStay2D(Collider2D other)
@@ -21,6 +27,23 @@ public class MonsterDamageDealer : MonoBehaviour
     {
         if (Time.time < nextDamageTime || other == null)
         {
+            return;
+        }
+
+        PlayerInvincibility playerInvincibility = other.GetComponent<PlayerInvincibility>();
+        if (playerInvincibility == null)
+        {
+            playerInvincibility = other.GetComponentInParent<PlayerInvincibility>();
+        }
+
+        if (playerInvincibility != null)
+        {
+            if (playerInvincibility.TryTakeEnergyDamage(damageToEnergy))
+            {
+                nextDamageTime = Time.time + damageCooldown;
+                Debug.Log($"Monster attacked player. Energy damage: {damageToEnergy}");
+            }
+
             return;
         }
 
@@ -37,6 +60,6 @@ public class MonsterDamageDealer : MonoBehaviour
 
         energyStore.TakeEnergyDamage(damageToEnergy);
         nextDamageTime = Time.time + damageCooldown;
-        Debug.Log($"[MonsterDamageDealer] {name} hit player for {damageToEnergy} energy.");
+        Debug.Log($"Monster attacked player. Energy damage: {damageToEnergy}");
     }
 }

@@ -86,6 +86,7 @@ public class CaveLevelGenerator : MonoBehaviour
     private int[] mainPathPlatformY;
     private bool[,] solidMap;
     private readonly List<StablePlatform> stableMainPlatforms = new List<StablePlatform>();
+    private readonly HashSet<int> occupiedStablePlatformIndices = new HashSet<int>();
     private Vector3 currentSpawnWorldPosition;
     private bool hasCurrentLevelSpawnPosition;
     private PhysicsMaterial2D runtimeNoFrictionMaterial;
@@ -314,6 +315,7 @@ public class CaveLevelGenerator : MonoBehaviour
         height = 18;
 
         stableMainPlatforms.Clear();
+        occupiedStablePlatformIndices.Clear();
         BuildStableMainPlatforms();
         PaintStableCaveBackground();
         PaintStableMainPlatforms();
@@ -545,6 +547,7 @@ public class CaveLevelGenerator : MonoBehaviour
             Vector3 worldPos = wallTilemap.GetCellCenterWorld(nodeCell);
             GameObject node = Instantiate(caveEnergyNodePrefab, worldPos, Quaternion.identity, levelObjectsRoot);
             node.name = "CaveEnergyNodePlaceholder";
+            occupiedStablePlatformIndices.Add(candidateIndices[i]);
 
             if (node.GetComponent<CaveEnergyNode>() == null)
             {
@@ -614,6 +617,11 @@ public class CaveLevelGenerator : MonoBehaviour
         List<int> candidateIndices = new List<int>();
         for (int i = 1; i < stableMainPlatforms.Count - 1; i++)
         {
+            if (occupiedStablePlatformIndices.Contains(i))
+            {
+                continue;
+            }
+
             candidateIndices.Add(i);
         }
 
@@ -662,15 +670,23 @@ public class CaveLevelGenerator : MonoBehaviour
         rb.gravityScale = 0f;
         rb.freezeRotation = true;
 
-        BoxCollider2D boxCollider = monster.GetComponent<BoxCollider2D>();
-        if (boxCollider == null)
+        Collider2D[] monsterColliders = monster.GetComponents<Collider2D>();
+        if (monsterColliders.Length == 0)
         {
-            boxCollider = monster.AddComponent<BoxCollider2D>();
+            monsterColliders = new Collider2D[] { monster.AddComponent<BoxCollider2D>() };
         }
 
-        boxCollider.isTrigger = false;
-        boxCollider.size = Vector2.one;
-        boxCollider.offset = Vector2.zero;
+        for (int i = 0; i < monsterColliders.Length; i++)
+        {
+            monsterColliders[i].isTrigger = true;
+
+            BoxCollider2D boxCollider = monsterColliders[i] as BoxCollider2D;
+            if (boxCollider != null)
+            {
+                boxCollider.size = Vector2.one;
+                boxCollider.offset = Vector2.zero;
+            }
+        }
 
         if (monster.GetComponent<MonsterHealth>() == null)
         {
