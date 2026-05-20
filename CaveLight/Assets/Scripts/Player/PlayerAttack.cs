@@ -6,7 +6,8 @@ public class PlayerAttack : MonoBehaviour
     public float attackDamage = 1f;
     public float attackCooldown = 0.4f;
     public float attackRange = 1.2f;
-    public float attackRadius = 0.5f;
+    public float attackRadius = 1.1f;
+    public Vector2 attackCenterOffset = new Vector2(0.35f, -0.2f);
 
     private float nextAttackTime;
     private float lastFacingDirection = 1f;
@@ -69,6 +70,8 @@ public class PlayerAttack : MonoBehaviour
     private Vector2 GetAttackCenter()
     {
         float facingDirection = Mathf.Abs(lastFacingDirection) > 0.01f ? Mathf.Sign(lastFacingDirection) : 1f;
-        return (Vector2)transform.position + Vector2.right * facingDirection * attackRange;
+        Vector2 offset = attackCenterOffset;
+        offset.x *= facingDirection;
+        return (Vector2)transform.position + offset;
     }
 }

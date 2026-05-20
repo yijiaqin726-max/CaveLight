@@ -76,6 +76,8 @@ public class CaveEnergyNode : MonoBehaviour, IDamageable
             Vector2 offset = Random.insideUnitCircle * dropRadius;
             Vector3 spawnPosition = transform.position + new Vector3(offset.x, offset.y, 0f);
             GameObject energy = Instantiate(energyPrefab, spawnPosition, Quaternion.identity);
+            ConfigureEnergyDrop(energy);
+
             Rigidbody2D rb = energy.GetComponent<Rigidbody2D>();
             if (rb != null)
             {
@@ -85,5 +87,47 @@ public class CaveEnergyNode : MonoBehaviour, IDamageable
         }
 
         Debug.Log($"[CaveEnergyNode] {name} spawned {dropCount} energy drops.");
+    }
+
+    private void ConfigureEnergyDrop(GameObject energy)
+    {
+        if (energy == null)
+        {
+            return;
+        }
+
+        CircleCollider2D circleCollider = energy.GetComponent<CircleCollider2D>();
+        if (circleCollider == null)
+        {
+            circleCollider = energy.AddComponent<CircleCollider2D>();
+        }
+
+        circleCollider.isTrigger = true;
+        circleCollider.radius = 0.2f;
+
+        Rigidbody2D rb = energy.GetComponent<Rigidbody2D>();
+        if (rb == null)
+        {
+            rb = energy.AddComponent<Rigidbody2D>();
+        }
+
+        rb.bodyType = RigidbodyType2D.Dynamic;
+        rb.gravityScale = 1f;
+        rb.freezeRotation = true;
+
+        SpriteRenderer spriteRenderer = energy.GetComponent<SpriteRenderer>();
+        if (spriteRenderer != null)
+        {
+            spriteRenderer.sortingOrder = 25;
+            spriteRenderer.color = new Color(1f, 0.92f, 0.35f, 1f);
+        }
+
+        if (energy.GetComponent<EnergyPickup>() == null)
+        {
+            Debug.LogWarning($"[CaveEnergyNode] Spawned energy {energy.name} is missing EnergyPickup.");
+        }
+
+        energy.transform.localScale = new Vector3(0.5f, 0.5f, 1f);
+        Debug.Log($"[CaveEnergyNode] Spawned energy {energy.name}, hasCircleCollider={circleCollider != null}, isTrigger={circleCollider.isTrigger}, radius={circleCollider.radius}, hasRigidbody={rb != null}");
     }
 }
