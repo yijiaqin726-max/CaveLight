@@ -125,7 +125,6 @@ public class MerchantRoomController : MonoBehaviour
         itemPool.Add(new ShopItem("广域磁吸", 20, "能源吸收范围 +1。", ApplyWideMagnet));
         itemPool.Add(new ShopItem("照明水晶", 25, "照明范围 +1。真实光照系统完成后生效。", ApplyLightCrystal));
     }
-
     private void RollShopItems()
     {
         List<ShopItem> available = new List<ShopItem>(itemPool);
@@ -195,10 +194,35 @@ public class MerchantRoomController : MonoBehaviour
 
         playerEnergyStore.ConsumeEnergy(item.Cost);
         item.Apply?.Invoke();
+        RunStatsManager.Instance.AddPurchasedItem(GetPurchasedItemDisplayName(item));
         purchased[index] = true;
         ShowDialogue($"已购买：{item.Name}", 1.5f);
         Debug.Log($"[MerchantRoomController] 已购买：{item.Name}");
         RefreshShopUi();
+    }
+
+    private string GetPurchasedItemDisplayName(ShopItem item)
+    {
+        if (item == null || item.Apply == null)
+        {
+            return "\u672a\u77e5\u5546\u54c1";
+        }
+
+        switch (item.Apply.Method.Name)
+        {
+            case nameof(ApplyEnergyBackpack):
+                return "\u84c4\u80fd\u80cc\u5305";
+            case nameof(ApplySharpPickaxe):
+                return "\u950b\u5229\u77ff\u9550";
+            case nameof(ApplyStableWick):
+                return "\u7a33\u5b9a\u706f\u82af";
+            case nameof(ApplyWideMagnet):
+                return "\u5e7f\u57df\u78c1\u5438";
+            case nameof(ApplyLightCrystal):
+                return "\u7167\u660e\u6c34\u6676";
+            default:
+                return item.Name;
+        }
     }
 
     private void ApplyEnergyBackpack()

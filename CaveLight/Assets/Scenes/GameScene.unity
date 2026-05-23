@@ -193,9 +193,9 @@ TilemapRenderer:
   m_AutoUVMaxDistance: 0.5
   m_AutoUVMaxAngle: 89
   m_LightmapParameters: {fileID: 0}
-  m_SortingLayerID: 0
-  m_SortingLayer: 0
-  m_SortingOrder: 0
+  m_SortingLayerID: 132814735
+  m_SortingLayer: 1
+  m_SortingOrder: -5
   m_ChunkSize: {x: 32, y: 32, z: 32}
   m_ChunkCullingBounds: {x: 0, y: 0, z: 0}
   m_MaxChunkCount: 16
@@ -1241,9 +1241,9 @@ TilemapRenderer:
   m_AutoUVMaxDistance: 0.5
   m_AutoUVMaxAngle: 89
   m_LightmapParameters: {fileID: 0}
-  m_SortingLayerID: 0
-  m_SortingLayer: 0
-  m_SortingOrder: 1
+  m_SortingLayerID: 132814735
+  m_SortingLayer: 1
+  m_SortingOrder: 0
   m_ChunkSize: {x: 32, y: 32, z: 32}
   m_ChunkCullingBounds: {x: 0, y: 0, z: 0}
   m_MaxChunkCount: 16
@@ -2152,9 +2152,9 @@ TilemapRenderer:
   m_AutoUVMaxDistance: 0.5
   m_AutoUVMaxAngle: 89
   m_LightmapParameters: {fileID: 0}
-  m_SortingLayerID: 0
-  m_SortingLayer: 0
-  m_SortingOrder: 2
+  m_SortingLayerID: 132814735
+  m_SortingLayer: 1
+  m_SortingOrder: 1
   m_ChunkSize: {x: 32, y: 32, z: 32}
   m_ChunkCullingBounds: {x: 0, y: 0, z: 0}
   m_MaxChunkCount: 16
@@ -2500,7 +2500,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 558641054737368756, guid: f326533ae3712be488e06e220132fe5b, type: 3}
       propertyPath: m_SortingOrder
-      value: 5
+      value: 10
       objectReference: {fileID: 0}
     - target: {fileID: 1894892073549073767, guid: f326533ae3712be488e06e220132fe5b, type: 3}
       propertyPath: m_GravityScale
@@ -2568,12 +2568,6 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 3530983290102004338, guid: f326533ae3712be488e06e220132fe5b, type: 3}
       insertIndex: -1
       addedObject: {fileID: 2023205760}
-    - targetCorrespondingSourceObject: {fileID: 3530983290102004338, guid: f326533ae3712be488e06e220132fe5b, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 2023205764}
-    - targetCorrespondingSourceObject: {fileID: 3530983290102004338, guid: f326533ae3712be488e06e220132fe5b, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 2023205765}
     - targetCorrespondingSourceObject: {fileID: 3530983290102004338, guid: f326533ae3712be488e06e220132fe5b, type: 3}
       insertIndex: -1
       addedObject: {fileID: 2023205767}
@@ -2759,6 +2753,7 @@ GameObject:
   - component: {fileID: 1967921017}
   - component: {fileID: 1967921021}
   - component: {fileID: 1967921020}
+  - component: {fileID: 1967921022}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -2847,7 +2842,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1967921016}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: e73e87e1131c94448a965dc83f4c284f, type: 3}
   m_Name: 
@@ -2855,6 +2850,22 @@ MonoBehaviour:
   target: {fileID: 2023205758}
   smoothTime: 0.15
   offset: {x: 0, y: 1, z: 0}
+--- !u!114 &1967921022
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1967921016}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f15598950e4541f088f6071b3a4cbd76, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  padding: 0.2
+  minOrthographicSize: 5
+  maxOrthographicSize: 20
+  cameraZ: -10
 --- !u!114 &1967921021
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2942,49 +2953,6 @@ MonoBehaviour:
   maxEnergy: 100
   currentEnergy: 100
   drainPerSecond: 5
---- !u!114 &2023205764
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2023205754}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: aa609fd820d8ca64e885accb38ff57be, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  targetLight: {fileID: 0}
-  energyStore: {fileID: 2023205760}
-  maxOuterRadius: 6
-  minOuterRadius: 1.5
-  maxIntensity: 1
-  minIntensity: 0.25
-  lowEnergyThreshold: 0.25
-  flickerAmount: 0.25
-  flickerSpeed: 8
---- !u!114 &2023205765
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2023205754}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9c35057c00b442c43adaa3b1720686c9, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  energyStore: {fileID: 2023205760}
-  lightVisual: {fileID: 0}
-  maxScale: 4
-  sortingOrder: 100
-  lowEnergyThreshold: 0.25
-  flickerAmount: 0.25
-  flickerSpeed: 8
-  generatedCircleSprite: {fileID: 0}
-  unlitMaterial: {fileID: 0}
-  renderSettingsLogged: 0
 --- !u!114 &2023205766
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3144,8 +3112,8 @@ Canvas:
   m_VertexColorAlwaysGammaSpace: 0
   m_AdditionalShaderChannelsFlag: 25
   m_UpdateRectTransformForStandalone: 0
-  m_SortingLayerID: 0
-  m_SortingOrder: 0
+  m_SortingLayerID: 512904733
+  m_SortingOrder: 200
   m_TargetDisplay: 0
 --- !u!224 &2117938592
 RectTransform:

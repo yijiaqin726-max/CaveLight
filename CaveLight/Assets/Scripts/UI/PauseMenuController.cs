@@ -53,6 +53,12 @@ public class PauseMenuController : MonoBehaviour
 
     private void Update()
     {
+        GameOverController gameOverController = FindFirstObjectByType<GameOverController>();
+        if (gameOverController != null && gameOverController.IsGameOverVisible)
+        {
+            return;
+        }
+
         if (Input.GetKeyDown(KeyCode.Escape))
         {
             TogglePause();

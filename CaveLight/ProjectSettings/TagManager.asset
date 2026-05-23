@@ -41,3 +41,15 @@ TagManager:
   - name: Default
     uniqueID: 0
     locked: 0
+  - name: Gameplay
+    uniqueID: 132814735
+    locked: 0
+  - name: Darkness
+    uniqueID: 242739611
+    locked: 0
+  - name: Important
+    uniqueID: 387604229
+    locked: 0
+  - name: UI
+    uniqueID: 512904733
+    locked: 0

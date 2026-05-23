@@ -4,6 +4,7 @@ using UnityEngine;
 public class PlayerEnergyStore : MonoBehaviour
 {
     public event Action EnergyDepleted;
+    public event Action OnEnergyDepleted;
 
     [Header("Energy")]
     public float maxEnergy = 100f;
@@ -86,6 +87,7 @@ public class PlayerEnergyStore : MonoBehaviour
         {
             energyDepletedTriggered = true;
             Debug.Log("Energy depleted. Game Over.");
+            OnEnergyDepleted?.Invoke();
             EnergyDepleted?.Invoke();
         }
     }

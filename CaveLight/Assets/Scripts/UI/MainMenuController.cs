@@ -57,6 +57,7 @@ public class MainMenuController : MonoBehaviour
     public void StartGame()
     {
         Time.timeScale = 1f;
+        RunStatsManager.Instance.ResetRun();
         SceneManager.LoadScene(GameSceneName);
     }
 

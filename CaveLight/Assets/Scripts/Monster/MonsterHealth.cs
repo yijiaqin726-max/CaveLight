@@ -54,6 +54,7 @@ public class MonsterHealth : MonoBehaviour, IDamageable
         }
 
         dead = true;
+        RunStatsManager.Instance.AddMonsterKilled();
         SpawnEnergyDrops();
 
         CaveLevelGenerator levelGenerator = FindFirstObjectByType<CaveLevelGenerator>();

@@ -16,8 +16,8 @@ public class CaveLevelGenerator : MonoBehaviour
     public Tile groundTile;
 
     [Header("Map Size")]
-    public int width = 24;
-    public int height = 12;
+    public int width = 32;
+    public int height = 18;
 
     [Header("Level Design")]
     public int maxJumpHeight = 2;
@@ -87,6 +87,11 @@ public class CaveLevelGenerator : MonoBehaviour
     private bool[,] solidMap;
     private readonly List<StablePlatform> stableMainPlatforms = new List<StablePlatform>();
     private readonly HashSet<int> occupiedStablePlatformIndices = new HashSet<int>();
+    private readonly List<SpawnPoint> platformSpawnPoints = new List<SpawnPoint>();
+    private readonly List<SpawnPoint> validMonsterSpawnPoints = new List<SpawnPoint>();
+    private readonly List<SpawnPoint> rejectedMonsterSpawnPoints = new List<SpawnPoint>();
+    private readonly List<Vector3> actualMonsterSpawnPositions = new List<Vector3>();
+    private readonly List<Vector3> energyNodeSpawnPositions = new List<Vector3>();
     private Vector3 currentSpawnWorldPosition;
     private bool hasCurrentLevelSpawnPosition;
     private PhysicsMaterial2D runtimeNoFrictionMaterial;
@@ -135,8 +140,25 @@ public class CaveLevelGenerator : MonoBehaviour
         }
     }
 
+    private struct SpawnPoint
+    {
+        public Vector3 worldPosition;
+        public int platformIndex;
+        public int platformStartX;
+        public int platformEndX;
+        public int platformY;
+        public int cellX;
+        public bool isEntrancePlatform;
+        public bool isExitPlatform;
+        public bool canSpawnMonster;
+        public bool canSpawnEnergyNode;
+        public string invalidReason;
+    }
+
     void Start()
     {
+        RunStatsManager.Instance.ResetRun();
+
         caveAmount = 1;
         cavesClearedSinceMerchant = 0;
         totalCavesCleared = 0;
@@ -204,6 +226,7 @@ public class CaveLevelGenerator : MonoBehaviour
             return;
         }
 
+        RunStatsManager.Instance.AddCaveCleared();
         totalCavesCleared += 1;
         cavesClearedSinceMerchant += 1;
         Debug.Log($"[CaveLevelGenerator] Cave cleared. totalCavesCleared={totalCavesCleared}, cavesClearedSinceMerchant={cavesClearedSinceMerchant}");
@@ -301,8 +324,32 @@ public class CaveLevelGenerator : MonoBehaviour
 
         GenerateStableGameJamMap();
         RefreshWallTilemapCollider();
+        FitCameraToGeneratedMap();
+        LogMapAspectDebug();
 
         Debug.Log("[CaveLevelGenerator] Stable GameJam map generation completed.");
+    }
+
+    private void FitCameraToGeneratedMap()
+    {
+        FixedMapCameraController fixedMapCamera = FindFirstObjectByType<FixedMapCameraController>();
+        if (fixedMapCamera == null && Camera.main != null)
+        {
+            fixedMapCamera = Camera.main.GetComponent<FixedMapCameraController>();
+            if (fixedMapCamera == null)
+            {
+                fixedMapCamera = Camera.main.gameObject.AddComponent<FixedMapCameraController>();
+            }
+        }
+
+        if (fixedMapCamera != null)
+        {
+            fixedMapCamera.FitToTilemap(wallTilemap);
+        }
+        else
+        {
+            Debug.LogWarning("[CaveLevelGenerator] FixedMapCameraController not found. Camera fit skipped.");
+        }
     }
 
     private void GenerateStableGameJamMap()
@@ -311,14 +358,20 @@ public class CaveLevelGenerator : MonoBehaviour
         macroCols = 7;
         macroCellWidth = 8;
         macroCellHeight = 5;
-        width = 56;
+        width = 32;
         height = 18;
 
         stableMainPlatforms.Clear();
         occupiedStablePlatformIndices.Clear();
+        platformSpawnPoints.Clear();
+        validMonsterSpawnPoints.Clear();
+        rejectedMonsterSpawnPoints.Clear();
+        actualMonsterSpawnPositions.Clear();
+        energyNodeSpawnPositions.Clear();
         BuildStableMainPlatforms();
         PaintStableCaveBackground();
         PaintStableMainPlatforms();
+        BuildPlatformSpawnPoints();
         PaintStableDecorations();
 
         StablePlatform firstPlatform = stableMainPlatforms[0];
@@ -331,6 +384,7 @@ public class CaveLevelGenerator : MonoBehaviour
 
         PlacePlayer(spawnCell, new Vector3Int(spawnCell.x, spawnCell.y - 2, 0));
         SpawnCaveEnergyNodes(exitCell);
+        RefreshWallTilemapCollider();
         SpawnMonsters();
         SpawnExitOnStablePlatform(lastPlatform);
 
@@ -341,35 +395,38 @@ public class CaveLevelGenerator : MonoBehaviour
 
     private void BuildStableMainPlatforms()
     {
-        int[] safeHeights = { 3, 5, 7 };
-        int platformCount = Random.Range(6, 8);
-        int currentY = safeHeights[Random.Range(0, safeHeights.Length)];
+        int[] safeHeights = { 4, 5, 6, 7, 8 };
+        int platformCount = Random.Range(5, 8);
+        int currentY = 4;
         StablePlatform previous = default;
 
         for (int i = 0; i < platformCount; i++)
         {
-            int platformWidth = Random.Range(6, 11);
+            int platformWidth = Random.Range(4, 8);
             int targetX;
 
             if (i == 0)
             {
                 targetX = 2;
+                platformWidth = Random.Range(5, 7);
+                currentY = 4;
             }
             else if (i == platformCount - 1)
             {
-                targetX = width - 12;
-                platformWidth = 9;
+                targetX = Random.Range(25, 27);
+                platformWidth = Mathf.Min(Random.Range(4, 6), width - 2 - targetX);
+                currentY = Mathf.Clamp(currentY + Random.Range(-1, 2), 4, 8);
             }
             else
             {
                 float t = i / (float)(platformCount - 1);
-                targetX = Mathf.RoundToInt(Mathf.Lerp(2, width - 12, t)) + Random.Range(-1, 2);
+                targetX = Mathf.RoundToInt(Mathf.Lerp(7, 22, t)) + Random.Range(-1, 2);
             }
 
             if (i > 0)
             {
-                int maxReachableStart = previous.XEnd + 4;
-                int minForwardStart = previous.xStart + 4;
+                int maxReachableStart = previous.XEnd + 3;
+                int minForwardStart = previous.xStart + 3;
                 targetX = Mathf.Clamp(targetX, minForwardStart, maxReachableStart);
 
                 List<int> validHeights = new List<int>();
@@ -403,7 +460,7 @@ public class CaveLevelGenerator : MonoBehaviour
 
             if (groundTilemap != null)
             {
-                for (int y = 1; y < height - 1; y++)
+                for (int y = 0; y < height; y++)
                 {
                     groundTilemap.SetTile(new Vector3Int(x, y, 0), groundTile);
                 }
@@ -455,6 +512,41 @@ public class CaveLevelGenerator : MonoBehaviour
         }
     }
 
+    private void BuildPlatformSpawnPoints()
+    {
+        platformSpawnPoints.Clear();
+
+        for (int platformIndex = 0; platformIndex < stableMainPlatforms.Count; platformIndex++)
+        {
+            StablePlatform platform = stableMainPlatforms[platformIndex];
+            int startX = Mathf.Clamp(platform.xStart + 1, 1, width - 2);
+            int endX = Mathf.Clamp(platform.XEnd - 1, startX, width - 2);
+
+            for (int x = startX; x <= endX; x++)
+            {
+                Vector3Int groundCell = new Vector3Int(x, platform.y, 0);
+                Vector3 groundCenter = wallTilemap.GetCellCenterWorld(groundCell);
+                float groundTopY = groundCenter.y + wallTilemap.cellSize.y * 0.5f;
+                Vector3 worldPosition = new Vector3(groundCenter.x, groundTopY, 0f);
+
+                platformSpawnPoints.Add(new SpawnPoint
+                {
+                    worldPosition = worldPosition,
+                    platformIndex = platformIndex,
+                    platformStartX = platform.xStart,
+                    platformEndX = platform.XEnd,
+                    platformY = platform.y,
+                    cellX = x,
+                    isEntrancePlatform = platformIndex == 0,
+                    isExitPlatform = platformIndex == stableMainPlatforms.Count - 1,
+                    canSpawnMonster = false,
+                    canSpawnEnergyNode = true,
+                    invalidReason = string.Empty
+                });
+            }
+        }
+    }
+
     private void PaintStableDecorations()
     {
         if (decorationTilemap == null)
@@ -489,12 +581,15 @@ public class CaveLevelGenerator : MonoBehaviour
 
         currentExit = Instantiate(exitPrefab, exitWorldPos, Quaternion.identity, levelObjectsRoot);
         currentExit.name = "ExitPlaceholder";
+        SetupImportantSpriteRenderer(currentExit, 999);
 
         SpriteRenderer spriteRenderer = currentExit.GetComponent<SpriteRenderer>();
         if (spriteRenderer != null)
         {
-            spriteRenderer.sortingOrder = 20;
-            spriteRenderer.color = Color.green;
+            spriteRenderer.enabled = true;
+            Color color = Color.green;
+            color.a = 1f;
+            spriteRenderer.color = color;
         }
 
         BoxCollider2D boxCollider = currentExit.GetComponent<BoxCollider2D>();
@@ -547,7 +642,9 @@ public class CaveLevelGenerator : MonoBehaviour
             Vector3 worldPos = wallTilemap.GetCellCenterWorld(nodeCell);
             GameObject node = Instantiate(caveEnergyNodePrefab, worldPos, Quaternion.identity, levelObjectsRoot);
             node.name = "CaveEnergyNodePlaceholder";
+            SetupImportantSpriteRenderer(node, 999);
             occupiedStablePlatformIndices.Add(candidateIndices[i]);
+            energyNodeSpawnPositions.Add(worldPos);
 
             if (node.GetComponent<CaveEnergyNode>() == null)
             {
@@ -571,20 +668,7 @@ public class CaveLevelGenerator : MonoBehaviour
         else
         {
             spriteRenderer.enabled = true;
-            spriteRenderer.sortingLayerName = "Default";
-            spriteRenderer.sortingOrder = 30;
             spriteRenderer.color = new Color(1f, 0.92f, 0.1f, 1f);
-
-            Shader shader = Shader.Find("Universal Render Pipeline/2D/Sprite-Unlit-Default");
-            if (shader == null)
-            {
-                shader = Shader.Find("Sprites/Default");
-            }
-
-            if (shader != null)
-            {
-                spriteRenderer.material = new Material(shader);
-            }
         }
 
         BoxCollider2D boxCollider = node.GetComponent<BoxCollider2D>();
@@ -606,6 +690,56 @@ public class CaveLevelGenerator : MonoBehaviour
         Debug.Log($"[CaveLevelGenerator] Cave energy node generated at cell={nodeCell}, world={node.transform.position}, spriteRendererExists={spriteRenderer != null}, spriteRendererEnabled={(spriteRenderer != null && spriteRenderer.enabled)}, sortingOrder={(spriteRenderer != null ? spriteRenderer.sortingOrder : -1)}, colliderIsTrigger={boxCollider.isTrigger}, colliderSize={boxCollider.size}");
     }
 
+    private void SetupImportantSpriteRenderer(GameObject instance, int sortingOrder)
+    {
+        if (instance == null)
+        {
+            return;
+        }
+
+        SpriteRenderer spriteRenderer = instance.GetComponent<SpriteRenderer>();
+        if (spriteRenderer == null)
+        {
+            Debug.LogWarning($"[CaveLevelGenerator] {instance.name} is missing SpriteRenderer. Cannot set important sorting order.");
+            return;
+        }
+
+        spriteRenderer.enabled = true;
+        spriteRenderer.sortingLayerName = SortingLayerExists("Important") ? "Important" : "Default";
+        spriteRenderer.sortingOrder = sortingOrder;
+
+        Color color = spriteRenderer.color;
+        color.a = 1f;
+        spriteRenderer.color = color;
+
+        Shader shader = Shader.Find("Universal Render Pipeline/2D/Sprite-Unlit-Default");
+        if (shader == null)
+        {
+            shader = Shader.Find("Sprites/Default");
+        }
+
+        if (shader != null)
+        {
+            spriteRenderer.material = new Material(shader);
+        }
+
+        Debug.Log($"[CaveLevelGenerator] SetupImportantSpriteRenderer object={instance.name}, sortingOrder={spriteRenderer.sortingOrder}");
+    }
+
+    private static bool SortingLayerExists(string sortingLayerName)
+    {
+        SortingLayer[] sortingLayers = SortingLayer.layers;
+        for (int i = 0; i < sortingLayers.Length; i++)
+        {
+            if (sortingLayers[i].name == sortingLayerName)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private void SpawnMonsters()
     {
         if (monsterPrefab == null)
@@ -614,36 +748,342 @@ public class CaveLevelGenerator : MonoBehaviour
             return;
         }
 
-        List<int> candidateIndices = new List<int>();
-        for (int i = 1; i < stableMainPlatforms.Count - 1; i++)
+        validMonsterSpawnPoints.Clear();
+        rejectedMonsterSpawnPoints.Clear();
+        actualMonsterSpawnPositions.Clear();
+
+        float monsterHalfHeight = GetPrefabColliderHalfHeight(monsterPrefab);
+        float monsterHalfWidth = GetPrefabColliderHalfWidth(monsterPrefab);
+
+        for (int i = 0; i < platformSpawnPoints.Count; i++)
         {
-            if (occupiedStablePlatformIndices.Contains(i))
+            SpawnPoint spawnPoint = platformSpawnPoints[i];
+            spawnPoint.canSpawnMonster = ValidateMonsterSpawnPoint(spawnPoint, monsterHalfWidth, monsterHalfHeight, out string invalidReason, out Vector3 finalPosition);
+            spawnPoint.invalidReason = invalidReason;
+            spawnPoint.worldPosition = finalPosition;
+
+            if (spawnPoint.canSpawnMonster)
+            {
+                validMonsterSpawnPoints.Add(spawnPoint);
+            }
+            else
+            {
+                rejectedMonsterSpawnPoints.Add(spawnPoint);
+            }
+
+            Debug.Log($"[CaveLevelGenerator] Monster candidate platformIndex={spawnPoint.platformIndex}, position={spawnPoint.worldPosition}, valid={spawnPoint.canSpawnMonster}, reason={(string.IsNullOrEmpty(spawnPoint.invalidReason) ? "ok" : spawnPoint.invalidReason)}");
+        }
+
+        Debug.Log($"[CaveLevelGenerator] Monster spawn point summary: platforms={stableMainPlatforms.Count}, candidates={platformSpawnPoints.Count}, validCandidates={validMonsterSpawnPoints.Count}, rejectedCandidates={rejectedMonsterSpawnPoints.Count}");
+
+        if (validMonsterSpawnPoints.Count == 0)
+        {
+            Debug.LogWarning("[CaveLevelGenerator] No valid monster spawn point found.");
+            Debug.Log("[CaveLevelGenerator] Spawned 0 monsters.");
+            return;
+        }
+
+        Shuffle(validMonsterSpawnPoints);
+        int effectiveMinMonsters = Mathf.Max(1, minMonsters);
+        int effectiveMaxMonsters = Mathf.Max(effectiveMinMonsters, maxMonsters);
+
+        int distinctPlatformCount = CountDistinctMonsterPlatforms(validMonsterSpawnPoints);
+        int targetMonsterCount = Mathf.Clamp(Random.Range(effectiveMinMonsters, effectiveMaxMonsters + 1), 1, Mathf.Min(3, distinctPlatformCount));
+        int spawnedCount = 0;
+        HashSet<int> usedPlatformIndices = new HashSet<int>();
+
+        for (int i = 0; i < validMonsterSpawnPoints.Count && spawnedCount < targetMonsterCount; i++)
+        {
+            SpawnPoint spawnPoint = validMonsterSpawnPoints[i];
+            if (usedPlatformIndices.Contains(spawnPoint.platformIndex))
             {
                 continue;
             }
 
-            candidateIndices.Add(i);
-        }
-
-        Shuffle(candidateIndices);
-        int targetMonsterCount = Mathf.Clamp(Random.Range(minMonsters, maxMonsters + 1), 0, candidateIndices.Count);
-        int spawnedCount = 0;
-
-        for (int i = 0; i < candidateIndices.Count && spawnedCount < targetMonsterCount; i++)
-        {
-            StablePlatform platform = stableMainPlatforms[candidateIndices[i]];
-            Vector3Int monsterCell = new Vector3Int(platform.CenterX, platform.y + 1, 0);
-            Vector3 worldPos = wallTilemap.GetCellCenterWorld(monsterCell);
-
-            GameObject monster = Instantiate(monsterPrefab, worldPos, Quaternion.identity, levelObjectsRoot);
+            Vector3Int monsterCell = new Vector3Int(spawnPoint.cellX, spawnPoint.platformY + 1, 0);
+            GameObject monster = Instantiate(monsterPrefab, spawnPoint.worldPosition, Quaternion.identity, levelObjectsRoot);
             monster.name = "MonsterPlaceholder";
             ConfigureSpawnedMonster(monster, monsterCell);
 
-            Debug.Log($"[CaveLevelGenerator] Monster spawned platform index={candidateIndices[i]}, cell={monsterCell}, world pos={worldPos}");
+            bool insideGround = ResolveMonsterGroundOverlap(monster);
+            if (insideGround)
+            {
+                Destroy(monster);
+                Debug.LogWarning("[CaveLevelGenerator] Monster spawn failed: inside ground.");
+                continue;
+            }
+
+            usedPlatformIndices.Add(spawnPoint.platformIndex);
+            actualMonsterSpawnPositions.Add(monster.transform.position);
+            Debug.Log($"[CaveLevelGenerator] Monster spawned platform index={spawnPoint.platformIndex}, cellX={spawnPoint.cellX}, final={monster.transform.position}, groundY={spawnPoint.worldPosition.y - monsterHalfHeight - 0.05f:0.###}, halfHeight={monsterHalfHeight:0.###}, insideGround={insideGround}");
             spawnedCount++;
         }
 
+        if (spawnedCount == 0)
+        {
+            Debug.LogWarning("[CaveLevelGenerator] No valid monster spawn point found.");
+        }
+
         Debug.Log($"[CaveLevelGenerator] Spawned {spawnedCount} monsters.");
+    }
+
+    private bool ValidateMonsterSpawnPoint(SpawnPoint spawnPoint, float monsterHalfWidth, float monsterHalfHeight, out string invalidReason, out Vector3 finalPosition)
+    {
+        invalidReason = string.Empty;
+        finalPosition = spawnPoint.worldPosition;
+
+        int platformWidth = spawnPoint.platformEndX - spawnPoint.platformStartX + 1;
+        if (spawnPoint.isEntrancePlatform)
+        {
+            invalidReason = "entrance platform";
+            return false;
+        }
+
+        if (spawnPoint.isExitPlatform)
+        {
+            invalidReason = "exit platform";
+            return false;
+        }
+
+        if (platformWidth < 4)
+        {
+            invalidReason = "platform width < 4";
+            return false;
+        }
+
+        if (spawnPoint.platformStartX <= 0 || spawnPoint.platformEndX >= width - 1)
+        {
+            invalidReason = "platform touches map edge";
+            return false;
+        }
+
+        if (!IsSolidCell(spawnPoint.cellX, spawnPoint.platformY))
+        {
+            invalidReason = "no wall tile under spawn point";
+            return false;
+        }
+
+        for (int y = spawnPoint.platformY + 1; y <= spawnPoint.platformY + 3; y++)
+        {
+            if (IsSolidCell(spawnPoint.cellX, y))
+            {
+                invalidReason = "less than 3 cells of headroom";
+                return false;
+            }
+        }
+
+        Vector3 groundCenter = wallTilemap.GetCellCenterWorld(new Vector3Int(spawnPoint.cellX, spawnPoint.platformY, 0));
+        float groundTopY = groundCenter.y + wallTilemap.cellSize.y * 0.5f;
+        finalPosition = new Vector3(groundCenter.x, groundTopY + monsterHalfHeight + 0.05f, 0f);
+
+        for (int i = 0; i < energyNodeSpawnPositions.Count; i++)
+        {
+            if (Vector3.Distance(finalPosition, energyNodeSpawnPositions[i]) < 2f)
+            {
+                invalidReason = "too close to energy node";
+                return false;
+            }
+        }
+
+        if (hasCurrentLevelSpawnPosition && Vector3.Distance(finalPosition, currentSpawnWorldPosition) < 4f)
+        {
+            invalidReason = "too close to player spawn";
+            return false;
+        }
+
+        if (stableMainPlatforms.Count > 0)
+        {
+            StablePlatform exitPlatform = stableMainPlatforms[stableMainPlatforms.Count - 1];
+            Vector3 exitGroundCenter = wallTilemap.GetCellCenterWorld(new Vector3Int(exitPlatform.CenterX, exitPlatform.y, 0));
+            float exitGroundTopY = exitGroundCenter.y + wallTilemap.cellSize.y * 0.5f;
+            Vector3 exitApproxPosition = new Vector3(exitGroundCenter.x, exitGroundTopY + 1f, 0f);
+            if (Vector3.Distance(finalPosition, exitApproxPosition) < 4f)
+            {
+                invalidReason = "too close to exit";
+                return false;
+            }
+        }
+
+        if (WouldMonsterOverlapWallCells(finalPosition, monsterHalfWidth, monsterHalfHeight))
+        {
+            invalidReason = "monster body overlaps wall tile";
+            return false;
+        }
+
+        return true;
+    }
+
+    private bool WouldMonsterOverlapWallCells(Vector3 finalPosition, float monsterHalfWidth, float monsterHalfHeight)
+    {
+        float epsilon = 0.02f;
+        Vector3 bottomLeft = new Vector3(finalPosition.x - monsterHalfWidth + epsilon, finalPosition.y - monsterHalfHeight + epsilon, 0f);
+        Vector3 topRight = new Vector3(finalPosition.x + monsterHalfWidth - epsilon, finalPosition.y + monsterHalfHeight - epsilon, 0f);
+        Vector3Int minCell = wallTilemap.WorldToCell(bottomLeft);
+        Vector3Int maxCell = wallTilemap.WorldToCell(topRight);
+
+        for (int x = minCell.x; x <= maxCell.x; x++)
+        {
+            for (int y = minCell.y; y <= maxCell.y; y++)
+            {
+                if (IsSolidCell(x, y))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private int CountDistinctMonsterPlatforms(List<SpawnPoint> spawnPoints)
+    {
+        HashSet<int> platformIndices = new HashSet<int>();
+        for (int i = 0; i < spawnPoints.Count; i++)
+        {
+            platformIndices.Add(spawnPoints[i].platformIndex);
+        }
+
+        return platformIndices.Count;
+    }
+
+    private bool TrySnapSpawnPositionToGround(Vector3 desiredPosition, GameObject prefab, out Vector3 snappedPosition, out Vector2 groundHitPoint, out float monsterHalfHeight)
+    {
+        snappedPosition = desiredPosition;
+        groundHitPoint = Vector2.zero;
+        monsterHalfHeight = GetPrefabColliderHalfHeight(prefab);
+
+        if (wallTilemap == null)
+        {
+            Debug.LogWarning("[CaveLevelGenerator] WallTilemap missing. Cannot snap monster spawn to ground.");
+            return false;
+        }
+
+        Vector2 rayStart = desiredPosition + Vector3.up * 3f;
+        RaycastHit2D[] hits = Physics2D.RaycastAll(rayStart, Vector2.down, 8f);
+        RaycastHit2D bestHit = default;
+        float bestDistance = float.PositiveInfinity;
+
+        for (int i = 0; i < hits.Length; i++)
+        {
+            RaycastHit2D hit = hits[i];
+            if (hit.collider == null || (!hit.collider.transform.IsChildOf(wallTilemap.transform) && hit.collider.transform != wallTilemap.transform))
+            {
+                continue;
+            }
+
+            if (hit.distance < bestDistance)
+            {
+                bestHit = hit;
+                bestDistance = hit.distance;
+            }
+        }
+
+        if (bestHit.collider == null)
+        {
+            return false;
+        }
+
+        groundHitPoint = bestHit.point;
+        snappedPosition = new Vector3(desiredPosition.x, groundHitPoint.y + monsterHalfHeight + 0.05f, desiredPosition.z);
+        return true;
+    }
+
+    private float GetPrefabColliderHalfHeight(GameObject prefab)
+    {
+        if (prefab == null)
+        {
+            return 0.5f;
+        }
+
+        BoxCollider2D boxCollider = prefab.GetComponent<BoxCollider2D>();
+        if (boxCollider != null)
+        {
+            return Mathf.Max(0.1f, Mathf.Abs(boxCollider.size.y * prefab.transform.lossyScale.y) * 0.5f);
+        }
+
+        CapsuleCollider2D capsuleCollider = prefab.GetComponent<CapsuleCollider2D>();
+        if (capsuleCollider != null)
+        {
+            return Mathf.Max(0.1f, Mathf.Abs(capsuleCollider.size.y * prefab.transform.lossyScale.y) * 0.5f);
+        }
+
+        Collider2D collider = prefab.GetComponent<Collider2D>();
+        if (collider != null && collider.bounds.size.y > 0f)
+        {
+            return Mathf.Max(0.1f, collider.bounds.extents.y);
+        }
+
+        return 0.5f;
+    }
+
+    private float GetPrefabColliderHalfWidth(GameObject prefab)
+    {
+        if (prefab == null)
+        {
+            return 0.5f;
+        }
+
+        BoxCollider2D boxCollider = prefab.GetComponent<BoxCollider2D>();
+        if (boxCollider != null)
+        {
+            return Mathf.Max(0.1f, Mathf.Abs(boxCollider.size.x * prefab.transform.lossyScale.x) * 0.5f);
+        }
+
+        CapsuleCollider2D capsuleCollider = prefab.GetComponent<CapsuleCollider2D>();
+        if (capsuleCollider != null)
+        {
+            return Mathf.Max(0.1f, Mathf.Abs(capsuleCollider.size.x * prefab.transform.lossyScale.x) * 0.5f);
+        }
+
+        Collider2D collider = prefab.GetComponent<Collider2D>();
+        if (collider != null && collider.bounds.size.x > 0f)
+        {
+            return Mathf.Max(0.1f, collider.bounds.extents.x);
+        }
+
+        return 0.5f;
+    }
+
+    private bool ResolveMonsterGroundOverlap(GameObject monster)
+    {
+        Collider2D monsterCollider = monster != null ? monster.GetComponent<Collider2D>() : null;
+        if (monsterCollider == null || wallTilemap == null)
+        {
+            return false;
+        }
+
+        for (int attempt = 0; attempt < 10 && IsMonsterInsideGround(monsterCollider); attempt++)
+        {
+            monster.transform.position += Vector3.up * 0.1f;
+        }
+
+        return IsMonsterInsideGround(monsterCollider);
+    }
+
+    private bool IsMonsterInsideGround(Collider2D monsterCollider)
+    {
+        if (monsterCollider == null || wallTilemap == null)
+        {
+            return false;
+        }
+
+        Collider2D[] wallColliders = wallTilemap.GetComponents<Collider2D>();
+        for (int i = 0; i < wallColliders.Length; i++)
+        {
+            Collider2D wallCollider = wallColliders[i];
+            if (wallCollider == null || !wallCollider.enabled)
+            {
+                continue;
+            }
+
+            ColliderDistance2D distance = monsterCollider.Distance(wallCollider);
+            if (distance.isOverlapped)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private void ConfigureSpawnedMonster(GameObject monster, Vector3Int monsterCell)
@@ -652,7 +1092,8 @@ public class CaveLevelGenerator : MonoBehaviour
         if (spriteRenderer != null)
         {
             spriteRenderer.enabled = true;
-            spriteRenderer.sortingOrder = 25;
+            spriteRenderer.sortingLayerName = "Gameplay";
+            spriteRenderer.sortingOrder = 8;
             spriteRenderer.color = new Color(0.9f, 0.15f, 1f, 1f);
         }
         else
@@ -734,6 +1175,20 @@ public class CaveLevelGenerator : MonoBehaviour
             StablePlatform platform = stableMainPlatforms[i];
             Debug.Log($"[CaveLevelGenerator] Stable platform index={i}, xStart={platform.xStart}, xEnd={platform.XEnd}, y={platform.y}, width={platform.width}");
         }
+    }
+
+    private void LogMapAspectDebug()
+    {
+        float mapAspect = height > 0 ? width / (float)height : 0f;
+        float targetAspect = 16f / 9f;
+        bool nearSixteenNine = Mathf.Abs(mapAspect - targetAspect) < 0.05f;
+        Bounds wallBounds = wallTilemap != null ? wallTilemap.localBounds : default;
+
+        Camera main = Camera.main;
+        float cameraSize = main != null ? main.orthographicSize : 0f;
+        Vector3 cameraPosition = main != null ? main.transform.position : Vector3.zero;
+
+        Debug.Log($"[CaveLevelGenerator] mapWidth={width}, mapHeight={height}, mapAspect={mapAspect:0.000}, targetAspect={targetAspect:0.000}, near16x9={nearSixteenNine}, cameraOrthographicSize={cameraSize:0.000}, cameraPosition={cameraPosition}, tilemapBoundsCenter={wallBounds.center}, tilemapBoundsSize={wallBounds.size}");
     }
 
     private void ClearAllLevelTilemaps()
@@ -1823,12 +2278,15 @@ public class CaveLevelGenerator : MonoBehaviour
 
         currentExit = Instantiate(exitPrefab, exitWorldPos, Quaternion.identity, levelObjectsRoot);
         currentExit.name = "ExitPlaceholder";
+        SetupImportantSpriteRenderer(currentExit, 999);
 
         SpriteRenderer spriteRenderer = currentExit.GetComponent<SpriteRenderer>();
         if (spriteRenderer != null)
         {
-            spriteRenderer.sortingOrder = 20;
-            spriteRenderer.color = Color.green;
+            spriteRenderer.enabled = true;
+            Color color = Color.green;
+            color.a = 1f;
+            spriteRenderer.color = color;
         }
 
         BoxCollider2D boxCollider = currentExit.GetComponent<BoxCollider2D>();
@@ -1916,6 +2374,7 @@ public class CaveLevelGenerator : MonoBehaviour
 
             GameObject node = Instantiate(caveEnergyNodePrefab, worldPos, Quaternion.identity, levelObjectsRoot);
             node.name = "CaveEnergyNodePlaceholder";
+            SetupImportantSpriteRenderer(node, 999);
 
             if (node.GetComponent<CaveEnergyNode>() == null)
             {
@@ -1925,6 +2384,15 @@ public class CaveLevelGenerator : MonoBehaviour
             if (node.GetComponent<BoxCollider2D>() == null)
             {
                 Debug.LogWarning($"[CaveLevelGenerator] Spawned cave energy node at {nodeCell} is missing BoxCollider2D.");
+            }
+
+            SpriteRenderer spriteRenderer = node.GetComponent<SpriteRenderer>();
+            if (spriteRenderer != null)
+            {
+                spriteRenderer.enabled = true;
+                Color color = spriteRenderer.color;
+                color.a = 1f;
+                spriteRenderer.color = color;
             }
 
             Debug.Log($"[CaveLevelGenerator] Cave energy node macro={macroCell}, cell={nodeCell}, world pos={worldPos}");
@@ -1974,6 +2442,17 @@ public class CaveLevelGenerator : MonoBehaviour
         {
             int swapIndex = Random.Range(0, i + 1);
             Vector2Int temp = values[i];
+            values[i] = values[swapIndex];
+            values[swapIndex] = temp;
+        }
+    }
+
+    private void Shuffle(List<SpawnPoint> values)
+    {
+        for (int i = values.Count - 1; i > 0; i--)
+        {
+            int swapIndex = Random.Range(0, i + 1);
+            SpawnPoint temp = values[i];
             values[i] = values[swapIndex];
             values[swapIndex] = temp;
         }
@@ -2040,24 +2519,45 @@ public class CaveLevelGenerator : MonoBehaviour
 
     private void OnDrawGizmosSelected()
     {
-        if (!debugDrawSolidCells || wallTilemap == null)
+        if (wallTilemap == null)
         {
             return;
         }
 
-        Gizmos.color = new Color(1f, 0f, 0f, 0.35f);
-        for (int x = 0; x < width; x++)
+        if (debugDrawSolidCells)
         {
-            for (int y = 0; y < height; y++)
+            Gizmos.color = new Color(1f, 0f, 0f, 0.35f);
+            for (int x = 0; x < width; x++)
             {
-                if (wallTilemap.GetTile(new Vector3Int(x, y, 0)) == null)
+                for (int y = 0; y < height; y++)
                 {
-                    continue;
-                }
+                    if (wallTilemap.GetTile(new Vector3Int(x, y, 0)) == null)
+                    {
+                        continue;
+                    }
 
-                Vector3 center = wallTilemap.GetCellCenterWorld(new Vector3Int(x, y, 0));
-                Gizmos.DrawCube(center, new Vector3(0.9f, 0.9f, 0.05f));
+                    Vector3 center = wallTilemap.GetCellCenterWorld(new Vector3Int(x, y, 0));
+                    Gizmos.DrawCube(center, new Vector3(0.9f, 0.9f, 0.05f));
+                }
             }
+        }
+
+        Gizmos.color = Color.gray;
+        for (int i = 0; i < rejectedMonsterSpawnPoints.Count; i++)
+        {
+            Gizmos.DrawSphere(rejectedMonsterSpawnPoints[i].worldPosition, 0.12f);
+        }
+
+        Gizmos.color = Color.red;
+        for (int i = 0; i < validMonsterSpawnPoints.Count; i++)
+        {
+            Gizmos.DrawSphere(validMonsterSpawnPoints[i].worldPosition, 0.15f);
+        }
+
+        Gizmos.color = new Color(0.75f, 0f, 1f, 1f);
+        for (int i = 0; i < actualMonsterSpawnPositions.Count; i++)
+        {
+            Gizmos.DrawSphere(actualMonsterSpawnPositions[i], 0.2f);
         }
     }
 }

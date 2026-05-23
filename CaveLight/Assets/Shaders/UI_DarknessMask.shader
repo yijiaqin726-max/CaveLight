@@ -5,9 +5,9 @@ Shader "UI/DarknessMask"
         _MainTex ("Texture", 2D) = "white" {}
         _Color ("Tint", Color) = (0, 0, 0, 1)
         _Center ("Center", Vector) = (0.5, 0.5, 0, 0)
-        _Radius ("Radius", Float) = 0.25
-        _Softness ("Softness", Float) = 0.08
-        _Opacity ("Opacity", Float) = 1.0
+        _Radius ("Radius", Float) = 0.14
+        _Softness ("Softness", Float) = 0.035
+        _Opacity ("Opacity", Float) = 0.75
         _Aspect ("Aspect", Float) = 1.777
     }
 
