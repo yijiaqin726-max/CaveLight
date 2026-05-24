@@ -7,6 +7,9 @@ using UnityEngine.UI;
 
 public class MerchantRoomController : MonoBehaviour
 {
+    [Header("Scene UI")]
+    public bool useFixedSceneUi = true;
+
     [Header("Player")]
     public PlayerEnergyStore playerEnergyStore;
     public PlayerAttack playerAttack;
@@ -69,7 +72,10 @@ public class MerchantRoomController : MonoBehaviour
     {
         FindReferences();
         BuildItemPool();
-        ConfigureMerchantRoomLayout();
+        if (!useFixedSceneUi)
+        {
+            ConfigureMerchantRoomLayout();
+        }
         BindButtons();
     }
 
@@ -77,7 +83,10 @@ public class MerchantRoomController : MonoBehaviour
     {
         Cursor.visible = true;
         FindReferences();
-        ConfigureMerchantRoomLayout();
+        if (!useFixedSceneUi)
+        {
+            ConfigureMerchantRoomLayout();
+        }
         RefreshEnergyText();
     }
 
@@ -86,7 +95,10 @@ public class MerchantRoomController : MonoBehaviour
         Cursor.visible = true;
         FindReferences();
         BuildItemPool();
-        ConfigureMerchantRoomLayout();
+        if (!useFixedSceneUi)
+        {
+            ConfigureMerchantRoomLayout();
+        }
         RollShopItems();
         BindButtons();
         RefreshShopUi();
