@@ -14,6 +14,11 @@ public class CaveLevelGenerator : MonoBehaviour
     [Header("Tiles")]
     public Tile wallTile;
     public Tile groundTile;
+    public Tile platformTile;
+    public Tile bottomTile;
+    public Tile ceilingTile;
+    public Tile leftWallTile;
+    public Tile rightWallTile;
 
     [Header("Map Size")]
     public int width = 32;
@@ -455,22 +460,14 @@ public class CaveLevelGenerator : MonoBehaviour
     {
         for (int x = 0; x < width; x++)
         {
-            wallTilemap.SetTile(new Vector3Int(x, 0, 0), wallTile);
-            wallTilemap.SetTile(new Vector3Int(x, height - 1, 0), wallTile);
-
-            if (groundTilemap != null)
-            {
-                for (int y = 0; y < height; y++)
-                {
-                    groundTilemap.SetTile(new Vector3Int(x, y, 0), groundTile);
-                }
-            }
+            wallTilemap.SetTile(new Vector3Int(x, 0, 0), GetBottomTile());
+            wallTilemap.SetTile(new Vector3Int(x, height - 1, 0), GetCeilingTile());
         }
 
         for (int y = 0; y < height; y++)
         {
-            wallTilemap.SetTile(new Vector3Int(0, y, 0), wallTile);
-            wallTilemap.SetTile(new Vector3Int(width - 1, y, 0), wallTile);
+            wallTilemap.SetTile(new Vector3Int(0, y, 0), GetLeftWallTile());
+            wallTilemap.SetTile(new Vector3Int(width - 1, y, 0), GetRightWallTile());
         }
 
         for (int x = 3; x < width - 3; x += Random.Range(4, 8))
@@ -478,7 +475,7 @@ public class CaveLevelGenerator : MonoBehaviour
             int ceilingDepth = Random.Range(1, 3);
             for (int y = 0; y < ceilingDepth; y++)
             {
-                wallTilemap.SetTile(new Vector3Int(x, height - 2 - y, 0), wallTile);
+                wallTilemap.SetTile(new Vector3Int(x, height - 2 - y, 0), GetCeilingTile());
             }
         }
     }
@@ -508,7 +505,7 @@ public class CaveLevelGenerator : MonoBehaviour
         xEnd = Mathf.Clamp(xEnd, 1, width - 2);
         for (int x = xStart; x <= xEnd; x++)
         {
-            wallTilemap.SetTile(new Vector3Int(x, y, 0), wallTile);
+            wallTilemap.SetTile(new Vector3Int(x, y, 0), GetPlatformTile());
         }
     }
 
@@ -587,7 +584,7 @@ public class CaveLevelGenerator : MonoBehaviour
         if (spriteRenderer != null)
         {
             spriteRenderer.enabled = true;
-            Color color = Color.green;
+            Color color = Color.white;
             color.a = 1f;
             spriteRenderer.color = color;
         }
@@ -634,6 +631,7 @@ public class CaveLevelGenerator : MonoBehaviour
             int rightEdgeX = platform.XEnd - 1;
             int x = Random.value < 0.5f ? leftEdgeX : rightEdgeX;
             Vector3Int nodeCell = new Vector3Int(x, platform.y + 2, 0);
+            Vector3Int groundCell = new Vector3Int(x, platform.y, 0);
             if (Mathf.Abs(nodeCell.x - exitCell.x) < 2)
             {
                 continue;
@@ -644,7 +642,6 @@ public class CaveLevelGenerator : MonoBehaviour
             node.name = "CaveEnergyNodePlaceholder";
             SetupImportantSpriteRenderer(node, 999);
             occupiedStablePlatformIndices.Add(candidateIndices[i]);
-            energyNodeSpawnPositions.Add(worldPos);
 
             if (node.GetComponent<CaveEnergyNode>() == null)
             {
@@ -652,6 +649,10 @@ public class CaveLevelGenerator : MonoBehaviour
             }
 
             ConfigureSpawnedCaveEnergyNodeVisual(node, nodeCell);
+            Vector3 groundCenter = wallTilemap.GetCellCenterWorld(groundCell);
+            float groundTopY = groundCenter.y + wallTilemap.cellSize.y * 0.5f;
+            AlignColliderBottomToGround(node, groundTopY);
+            energyNodeSpawnPositions.Add(node.transform.position);
             spawnedCount++;
         }
 
@@ -668,26 +669,93 @@ public class CaveLevelGenerator : MonoBehaviour
         else
         {
             spriteRenderer.enabled = true;
-            spriteRenderer.color = new Color(1f, 0.92f, 0.1f, 1f);
+            Color color = spriteRenderer.color;
+            color.a = 1f;
+            spriteRenderer.color = color;
         }
 
         BoxCollider2D boxCollider = node.GetComponent<BoxCollider2D>();
         if (boxCollider == null)
         {
-            boxCollider = node.AddComponent<BoxCollider2D>();
+            Debug.LogWarning($"[CaveLevelGenerator] Cave energy node at {nodeCell} is missing BoxCollider2D.");
         }
-
-        boxCollider.isTrigger = false;
-        boxCollider.size = new Vector2(0.8f, 0.8f);
-        boxCollider.offset = Vector2.zero;
 
         if (node.GetComponent<CaveEnergyNode>() == null)
         {
             Debug.LogWarning($"[CaveLevelGenerator] Spawned cave energy node at {nodeCell} is missing CaveEnergyNode script.");
         }
 
-        node.transform.localScale = Vector3.one;
-        Debug.Log($"[CaveLevelGenerator] Cave energy node generated at cell={nodeCell}, world={node.transform.position}, spriteRendererExists={spriteRenderer != null}, spriteRendererEnabled={(spriteRenderer != null && spriteRenderer.enabled)}, sortingOrder={(spriteRenderer != null ? spriteRenderer.sortingOrder : -1)}, colliderIsTrigger={boxCollider.isTrigger}, colliderSize={boxCollider.size}");
+        Debug.Log($"[CaveLevelGenerator] Cave energy node generated at cell={nodeCell}, world={node.transform.position}, spriteRendererExists={spriteRenderer != null}, spriteRendererEnabled={(spriteRenderer != null && spriteRenderer.enabled)}, sortingOrder={(spriteRenderer != null ? spriteRenderer.sortingOrder : -1)}, colliderIsTrigger={(boxCollider != null && boxCollider.isTrigger)}, colliderSize={(boxCollider != null ? boxCollider.size : Vector2.zero)}");
+    }
+
+    private void AlignColliderBottomToGround(GameObject obj, float groundTopY)
+    {
+        Physics2D.SyncTransforms();
+
+        Collider2D col = obj != null ? obj.GetComponent<Collider2D>() : null;
+        if (col == null)
+        {
+            Debug.LogWarning($"[CaveLevelGenerator] {(obj != null ? obj.name : "null")} has no Collider2D, cannot align to ground.");
+            return;
+        }
+
+        float colliderBottomY = col.bounds.min.y;
+        float deltaY = groundTopY - colliderBottomY + 0.02f;
+        obj.transform.position += new Vector3(0f, deltaY, 0f);
+
+        Physics2D.SyncTransforms();
+
+        Debug.Log($"[CaveLevelGenerator] Align {obj.name}: groundTopY={groundTopY}, oldBottom={colliderBottomY}, deltaY={deltaY}, newBottom={col.bounds.min.y}");
+    }
+
+    private bool TryFindGroundTopYBelow(Vector3 worldPos, out float groundTopY)
+    {
+        if (wallTilemap == null)
+        {
+            groundTopY = 0f;
+            return false;
+        }
+
+        Vector3Int startCell = wallTilemap.WorldToCell(worldPos);
+
+        for (int y = startCell.y + 3; y >= startCell.y - 8; y--)
+        {
+            Vector3Int cell = new Vector3Int(startCell.x, y, 0);
+            if (wallTilemap.HasTile(cell))
+            {
+                Vector3 center = wallTilemap.GetCellCenterWorld(cell);
+                groundTopY = center.y + wallTilemap.cellSize.y * 0.5f;
+                return true;
+            }
+        }
+
+        groundTopY = 0f;
+        return false;
+    }
+
+    private Tile GetPlatformTile()
+    {
+        return platformTile != null ? platformTile : wallTile;
+    }
+
+    private Tile GetBottomTile()
+    {
+        return bottomTile != null ? bottomTile : GetPlatformTile();
+    }
+
+    private Tile GetCeilingTile()
+    {
+        return ceilingTile != null ? ceilingTile : GetPlatformTile();
+    }
+
+    private Tile GetLeftWallTile()
+    {
+        return leftWallTile != null ? leftWallTile : GetBottomTile();
+    }
+
+    private Tile GetRightWallTile()
+    {
+        return rightWallTile != null ? rightWallTile : GetBottomTile();
     }
 
     private void SetupImportantSpriteRenderer(GameObject instance, int sortingOrder)
@@ -1816,11 +1884,6 @@ public class CaveLevelGenerator : MonoBehaviour
         {
             for (int y = originY; y < originY + macroCellHeight; y++)
             {
-                if (groundTilemap != null)
-                {
-                    groundTilemap.SetTile(new Vector3Int(x, y, 0), groundTile);
-                }
-
                 wallTilemap.SetTile(new Vector3Int(x, y, 0), null);
             }
         }
@@ -1847,7 +1910,7 @@ public class CaveLevelGenerator : MonoBehaviour
         {
             for (int y = originY; y < originY + blockHeight; y++)
             {
-                wallTilemap.SetTile(new Vector3Int(x, y, 0), wallTile);
+                wallTilemap.SetTile(new Vector3Int(x, y, 0), GetBottomTile());
             }
         }
 
@@ -1869,7 +1932,7 @@ public class CaveLevelGenerator : MonoBehaviour
                 continue;
             }
 
-            wallTilemap.SetTile(new Vector3Int(x, platformY, 0), wallTile);
+            wallTilemap.SetTile(new Vector3Int(x, platformY, 0), GetPlatformTile());
         }
 
         int pathIndex = GetMainPathIndex(row, col);
@@ -1910,7 +1973,7 @@ public class CaveLevelGenerator : MonoBehaviour
         int y = originY + 1;
         for (int x = startX; x < startX + platformWidth; x++)
         {
-            wallTilemap.SetTile(new Vector3Int(x, y, 0), wallTile);
+            wallTilemap.SetTile(new Vector3Int(x, y, 0), GetPlatformTile());
         }
     }
 
@@ -1925,7 +1988,7 @@ public class CaveLevelGenerator : MonoBehaviour
         {
             if (x > 0 && x < width - 1)
             {
-                wallTilemap.SetTile(new Vector3Int(x, y, 0), wallTile);
+                wallTilemap.SetTile(new Vector3Int(x, y, 0), GetPlatformTile());
             }
         }
     }
@@ -1941,7 +2004,7 @@ public class CaveLevelGenerator : MonoBehaviour
         int y = platformY + Random.Range(3, 5);
         if (y < height - 1)
         {
-            wallTilemap.SetTile(new Vector3Int(x, y, 0), wallTile);
+            wallTilemap.SetTile(new Vector3Int(x, y, 0), GetPlatformTile());
         }
     }
 
@@ -2160,14 +2223,14 @@ public class CaveLevelGenerator : MonoBehaviour
     {
         for (int x = 0; x < width; x++)
         {
-            wallTilemap.SetTile(new Vector3Int(x, 0, 0), wallTile);
-            wallTilemap.SetTile(new Vector3Int(x, height - 1, 0), wallTile);
+            wallTilemap.SetTile(new Vector3Int(x, 0, 0), GetBottomTile());
+            wallTilemap.SetTile(new Vector3Int(x, height - 1, 0), GetCeilingTile());
         }
 
         for (int y = 0; y < height; y++)
         {
-            wallTilemap.SetTile(new Vector3Int(0, y, 0), wallTile);
-            wallTilemap.SetTile(new Vector3Int(width - 1, y, 0), wallTile);
+            wallTilemap.SetTile(new Vector3Int(0, y, 0), GetLeftWallTile());
+            wallTilemap.SetTile(new Vector3Int(width - 1, y, 0), GetRightWallTile());
         }
 
         for (int col = 1; col < macroCols - 1; col++)
@@ -2175,7 +2238,7 @@ public class CaveLevelGenerator : MonoBehaviour
             if (Random.value < 0.5f)
             {
                 int x = col * macroCellWidth + Random.Range(2, macroCellWidth - 2);
-                wallTilemap.SetTile(new Vector3Int(x, height - 2, 0), wallTile);
+                wallTilemap.SetTile(new Vector3Int(x, height - 2, 0), GetCeilingTile());
             }
         }
     }
@@ -2188,7 +2251,7 @@ public class CaveLevelGenerator : MonoBehaviour
         {
             if (x > 0 && x < width - 1)
             {
-                wallTilemap.SetTile(new Vector3Int(x, platformY, 0), wallTile);
+                wallTilemap.SetTile(new Vector3Int(x, platformY, 0), GetPlatformTile());
             }
         }
     }
@@ -2284,7 +2347,7 @@ public class CaveLevelGenerator : MonoBehaviour
         if (spriteRenderer != null)
         {
             spriteRenderer.enabled = true;
-            Color color = Color.green;
+            Color color = Color.white;
             color.a = 1f;
             spriteRenderer.color = color;
         }
@@ -2316,7 +2379,7 @@ public class CaveLevelGenerator : MonoBehaviour
         {
             if (x > 0 && x < width - 1)
             {
-                wallTilemap.SetTile(new Vector3Int(x, platformY, 0), wallTile);
+                wallTilemap.SetTile(new Vector3Int(x, platformY, 0), GetPlatformTile());
             }
         }
     }
@@ -2395,7 +2458,16 @@ public class CaveLevelGenerator : MonoBehaviour
                 spriteRenderer.color = color;
             }
 
-            Debug.Log($"[CaveLevelGenerator] Cave energy node macro={macroCell}, cell={nodeCell}, world pos={worldPos}");
+            if (TryFindGroundTopYBelow(worldPos, out float groundTopY))
+            {
+                AlignColliderBottomToGround(node, groundTopY);
+            }
+            else
+            {
+                Debug.LogWarning($"[CaveLevelGenerator] Cannot find ground below crystal spawn position {worldPos}");
+            }
+
+            Debug.Log($"[CaveLevelGenerator] Cave energy node macro={macroCell}, cell={nodeCell}, world pos={node.transform.position}");
             spawnedCount++;
         }
 
