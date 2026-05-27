@@ -90,10 +90,14 @@ public class PauseMenuController : MonoBehaviour
             pauseMenuPanel.SetActive(true);
             pauseMenuPanel.transform.SetAsLastSibling();
         }
+
+        Debug.Log($"[PAUSE] PausePanel active = {(pauseMenuPanel != null && pauseMenuPanel.activeSelf)}");
+        Debug.Log($"[PAUSE] Time.timeScale = {Time.timeScale}");
     }
 
     public void ResumeGame()
     {
+        Debug.Log("[PAUSE BUTTON] Resume clicked");
         isPaused = false;
         Time.timeScale = 1f;
 
@@ -101,6 +105,9 @@ public class PauseMenuController : MonoBehaviour
         {
             pauseMenuPanel.SetActive(false);
         }
+
+        Debug.Log($"[PAUSE] PausePanel active = {(pauseMenuPanel != null && pauseMenuPanel.activeSelf)}");
+        Debug.Log($"[PAUSE] Time.timeScale = {Time.timeScale}");
     }
 
     public void RestartGame()
@@ -111,12 +118,14 @@ public class PauseMenuController : MonoBehaviour
 
     public void ReturnToMainMenu()
     {
+        Debug.Log("[PAUSE BUTTON] Main Menu clicked");
         Time.timeScale = 1f;
         SceneManager.LoadScene(MainMenuSceneName);
     }
 
     public void QuitGame()
     {
+        Debug.Log("[PAUSE BUTTON] Quit clicked");
         Time.timeScale = 1f;
 
 #if UNITY_EDITOR
@@ -140,6 +149,7 @@ public class PauseMenuController : MonoBehaviour
     {
         if (pauseMenuPanel != null)
         {
+            ConfigurePausePanelBounds(pauseMenuPanel);
             return;
         }
 
@@ -155,57 +165,150 @@ public class PauseMenuController : MonoBehaviour
 
         EnsureEventSystem();
 
-        Transform existingPanel = canvas.transform.Find("PauseMenuPanel");
+        Transform existingPanel = canvas.transform.Find("PausePanel");
+        if (existingPanel == null)
+        {
+            existingPanel = canvas.transform.Find("PauseMenuPanel");
+        }
+
         if (existingPanel != null)
         {
             pauseMenuPanel = existingPanel.gameObject;
+            ConfigurePausePanelBounds(pauseMenuPanel);
             return;
         }
 
         pauseMenuPanel = CreatePauseMenu(canvas.transform);
+        ConfigurePausePanelBounds(pauseMenuPanel);
         pauseMenuPanel.SetActive(false);
     }
 
     private GameObject CreatePauseMenu(Transform parent)
     {
-        RectTransform root = CreateUiObject("PauseMenuPanel", parent);
-        Stretch(root);
+        RectTransform root = CreateUiObject("PausePanel", parent);
+        SetAnchoredRect(root, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(520f, 420f));
 
-        Image overlay = root.gameObject.AddComponent<Image>();
-        overlay.color = new Color(0f, 0f, 0f, 0.55f);
-
-        RectTransform panel = CreateUiObject("PanelBackground", root);
-        SetAnchoredRect(panel, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(520f, 560f));
-
-        Image panelImage = panel.gameObject.AddComponent<Image>();
+        Image panelImage = root.gameObject.AddComponent<Image>();
         panelImage.color = new Color(0.07f, 0.09f, 0.12f, 0.96f);
-
-        VerticalLayoutGroup layout = panel.gameObject.AddComponent<VerticalLayoutGroup>();
-        layout.padding = new RectOffset(52, 52, 46, 46);
-        layout.spacing = 22f;
-        layout.childAlignment = TextAnchor.UpperCenter;
-        layout.childControlWidth = true;
-        layout.childControlHeight = false;
-        layout.childForceExpandWidth = true;
-        layout.childForceExpandHeight = false;
-
-        Text title = CreateText("TitleText", panel, "\u6682\u505c\u6e38\u620f", 38, FontStyle.Bold, TextAnchor.MiddleCenter, Color.white);
-        LayoutElement titleLayout = title.gameObject.AddComponent<LayoutElement>();
-        titleLayout.preferredHeight = 78f;
-
-        Button resumeButton = CreateButton("ResumeButton", panel, "\u7ee7\u7eed\u6e38\u620f");
-        resumeButton.onClick.AddListener(ResumeGame);
-
-        Button restartButton = CreateButton("RestartButton", panel, "\u91cd\u65b0\u5f00\u59cb\u672c\u5c40");
-        restartButton.onClick.AddListener(RestartGame);
-
-        Button mainMenuButton = CreateButton("MainMenuButton", panel, "\u8fd4\u56de\u4e3b\u83dc\u5355");
-        mainMenuButton.onClick.AddListener(ReturnToMainMenu);
-
-        Button quitButton = CreateButton("QuitButton", panel, "\u9000\u51fa\u6e38\u620f");
-        quitButton.onClick.AddListener(QuitGame);
+        CreatePauseMenuContents(root);
+        ConfigurePausePanelBounds(root.gameObject);
 
         return root.gameObject;
+    }
+
+    private void ConfigurePausePanelBounds(GameObject panelRoot)
+    {
+        RectTransform root = panelRoot.GetComponent<RectTransform>();
+        if (root == null)
+        {
+            return;
+        }
+
+        SetAnchoredRect(root, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(520f, 420f));
+
+        Image rootImage = root.GetComponent<Image>();
+        if (rootImage == null)
+        {
+            rootImage = root.gameObject.AddComponent<Image>();
+        }
+        rootImage.color = new Color(0.07f, 0.09f, 0.12f, 0.96f);
+        rootImage.raycastTarget = true;
+
+        CanvasGroup canvasGroup = root.GetComponent<CanvasGroup>();
+        if (canvasGroup == null)
+        {
+            canvasGroup = root.gameObject.AddComponent<CanvasGroup>();
+        }
+        canvasGroup.interactable = true;
+        canvasGroup.blocksRaycasts = true;
+        canvasGroup.ignoreParentGroups = false;
+
+        Transform panelTransform = root.Find("PanelBackground");
+        RectTransform panel = root;
+        if (panelTransform == null)
+        {
+            CreatePauseMenuContents(root);
+        }
+        else if (panelTransform.TryGetComponent(out RectTransform existingPanel))
+        {
+            panel = existingPanel;
+            SetAnchoredRect(panel, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+
+            VerticalLayoutGroup layout = panel.GetComponent<VerticalLayoutGroup>();
+            if (layout != null)
+            {
+                layout.padding = new RectOffset(52, 52, 42, 42);
+                layout.spacing = 28f;
+                layout.childAlignment = TextAnchor.UpperCenter;
+                layout.childControlWidth = true;
+                layout.childControlHeight = false;
+                layout.childForceExpandWidth = true;
+                layout.childForceExpandHeight = false;
+            }
+
+            Transform restartButton = panel.Find("RestartButton");
+            if (restartButton != null)
+            {
+                restartButton.gameObject.SetActive(false);
+            }
+        }
+
+        BindExistingButton(panel, "ResumeButton", ResumeGame);
+        BindExistingButton(panel, "MainMenuButton", ReturnToMainMenu);
+        BindExistingButton(panel, "QuitButton", QuitGame);
+    }
+
+    private RectTransform CreatePauseMenuContents(RectTransform root)
+    {
+        if (root.Find("ResumeButton") != null)
+        {
+            return root;
+        }
+
+        Image panelImage = root.GetComponent<Image>();
+        if (panelImage == null)
+        {
+            panelImage = root.gameObject.AddComponent<Image>();
+        }
+        panelImage.color = new Color(0.07f, 0.09f, 0.12f, 0.96f);
+        panelImage.raycastTarget = true;
+
+        RectTransform panel = root;
+
+        Text title = CreateText("TitleText", panel, "Paused", 38, FontStyle.Bold, TextAnchor.MiddleCenter, Color.white);
+        SetAnchoredRect(title.rectTransform, new Vector2(0.5f, 0.80f), new Vector2(0.5f, 0.80f), Vector2.zero, new Vector2(420f, 70f));
+
+        Button resumeButton = CreateButton("ResumeButton", panel, "Resume");
+        SetAnchoredRect(resumeButton.GetComponent<RectTransform>(), new Vector2(0.5f, 0.56f), new Vector2(0.5f, 0.56f), Vector2.zero, new Vector2(340f, 64f));
+
+        Button mainMenuButton = CreateButton("MainMenuButton", panel, "Main Menu");
+        SetAnchoredRect(mainMenuButton.GetComponent<RectTransform>(), new Vector2(0.5f, 0.36f), new Vector2(0.5f, 0.36f), Vector2.zero, new Vector2(340f, 64f));
+
+        Button quitButton = CreateButton("QuitButton", panel, "Quit");
+        SetAnchoredRect(quitButton.GetComponent<RectTransform>(), new Vector2(0.5f, 0.16f), new Vector2(0.5f, 0.16f), Vector2.zero, new Vector2(340f, 64f));
+
+        return panel;
+    }
+
+    private void BindExistingButton(Transform parent, string buttonName, UnityEngine.Events.UnityAction action)
+    {
+        Transform buttonTransform = parent.Find(buttonName);
+        if (buttonTransform == null)
+        {
+            return;
+        }
+
+        Button button = buttonTransform.GetComponent<Button>();
+        if (button == null)
+        {
+            return;
+        }
+
+        button.enabled = true;
+        button.interactable = true;
+        button.onClick.RemoveListener(action);
+        button.onClick.AddListener(action);
+        Debug.Log($"[PAUSE] Bound {buttonName} OnClick.");
     }
 
     private static Canvas CreateCanvas(string objectName)
@@ -238,12 +341,16 @@ public class PauseMenuController : MonoBehaviour
 
     private static void EnsureEventSystem()
     {
-        if (FindFirstObjectByType<EventSystem>() != null)
+        EventSystem eventSystem = FindFirstObjectByType<EventSystem>();
+        if (eventSystem != null)
         {
+            BaseInputModule inputModule = eventSystem.GetComponent<BaseInputModule>();
+            Debug.Log($"[PAUSE] EventSystem input module = {(inputModule != null ? inputModule.GetType().Name : "Missing")}");
             return;
         }
 
-        new GameObject("EventSystem", typeof(EventSystem), typeof(StandaloneInputModule));
+        GameObject eventSystemObject = new GameObject("EventSystem", typeof(EventSystem), typeof(StandaloneInputModule));
+        Debug.Log($"[PAUSE] EventSystem input module = {eventSystemObject.GetComponent<BaseInputModule>().GetType().Name}");
     }
 
     private static Button CreateButton(string objectName, Transform parent, string label)
@@ -263,6 +370,7 @@ public class PauseMenuController : MonoBehaviour
         colors.pressedColor = new Color(0.09f, 0.13f, 0.18f, 1f);
         colors.selectedColor = colors.highlightedColor;
         button.colors = colors;
+        button.targetGraphic = image;
 
         Text text = CreateText("Text", rect, label, 28, FontStyle.Bold, TextAnchor.MiddleCenter, Color.white);
         Stretch(text.rectTransform);

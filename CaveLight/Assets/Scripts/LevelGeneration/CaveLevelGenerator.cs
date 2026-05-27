@@ -162,6 +162,8 @@ public class CaveLevelGenerator : MonoBehaviour
 
     void Start()
     {
+        Debug.Log("[VERIFY] CaveLevelGenerator running");
+
         RunStatsManager.Instance.ResetRun();
 
         caveAmount = 1;
@@ -173,6 +175,7 @@ public class CaveLevelGenerator : MonoBehaviour
         {
             merchantRoomPanel.SetActive(false);
         }
+        Debug.Log($"[VERIFY] MerchantRoomPanel default active = {(merchantRoomPanel != null && merchantRoomPanel.activeSelf)}");
 
         if (enterNextCaveButton != null)
         {
@@ -309,6 +312,8 @@ public class CaveLevelGenerator : MonoBehaviour
 
     public void GenerateLevel()
     {
+        Debug.Log("[VERIFY] GenerateLevel called");
+
         if (inMerchantRoom)
         {
             return;
@@ -331,6 +336,7 @@ public class CaveLevelGenerator : MonoBehaviour
         RefreshWallTilemapCollider();
         FitCameraToGeneratedMap();
         LogMapAspectDebug();
+        Debug.Log($"[VERIFY] WallTilemap tile count = {(wallTilemap != null ? wallTilemap.GetUsedTilesCount() : 0)}");
 
         Debug.Log("[CaveLevelGenerator] Stable GameJam map generation completed.");
     }
@@ -2306,6 +2312,7 @@ public class CaveLevelGenerator : MonoBehaviour
         Debug.Log($"[CaveLevelGenerator] groundCell={groundCell}");
         Debug.Log($"[CaveLevelGenerator] player world pos={spawnWorld}");
         Debug.Log($"[CaveLevelGenerator] wallTile at groundCell is null? {tileAtGround == null}");
+        Debug.Log($"[VERIFY] Player placed at {spawnWorld}");
     }
 
     private void RespawnPlayerAtEntrance()

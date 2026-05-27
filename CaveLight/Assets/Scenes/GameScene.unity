@@ -531,7 +531,7 @@ GameObject:
   - component: {fileID: 266808868}
   - component: {fileID: 266808867}
   m_Layer: 5
-  m_Name: Slow Burn
+  m_Name: ProductButton_2
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -554,8 +554,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 160, y: 30}
+  m_AnchoredPosition: {x: 0, y: -80}
+  m_SizeDelta: {x: 360, y: 56}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &266808867
 MonoBehaviour:
@@ -731,7 +731,7 @@ GameObject:
   - component: {fileID: 319197559}
   - component: {fileID: 319197558}
   m_Layer: 5
-  m_Name: Enter Next Cave Button
+  m_Name: LeaveButton
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -754,8 +754,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 160, y: 30}
+  m_AnchoredPosition: {x: 0, y: -200}
+  m_SizeDelta: {x: 220, y: 52}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &319197558
 MonoBehaviour:
@@ -1007,7 +1007,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   wallTilemap: {fileID: 1017783212}
   groundTilemap: {fileID: 87464480}
-  decorationTilemap: {fileID: 0}
+  decorationTilemap: {fileID: 1384624855}
   wallTile: {fileID: 11400000, guid: 38963c2ab5ad47dab2a515a885cfd9b8, type: 2}
   groundTile: {fileID: 11400000, guid: d27f01ed6ba9467c94d6a211bb85830c, type: 2}
   platformTile: {fileID: 11400000, guid: e5609aa467a740baa8c076e2951d8bce, type: 2}
@@ -1034,7 +1034,7 @@ MonoBehaviour:
   totalCavesCleared: 0
   merchantRoomPanel: {fileID: 1261493161}
   enterNextCaveButton: {fileID: 319197558}
-  merchantRoomController: {fileID: 0}
+  merchantRoomController: {fileID: 1261493165}
   inMerchantRoom: 0
   caveEnergyNodePrefab: {fileID: 2090875948905333381, guid: 2bb04af91fa855646b1a39be3cde924e, type: 3}
   minCaveEnergyNodes: 2
@@ -1850,7 +1850,6 @@ GameObject:
   - component: {fileID: 1261493162}
   - component: {fileID: 1261493164}
   - component: {fileID: 1261493163}
-  - component: {fileID: 1261493165}
   m_Layer: 5
   m_Name: MerchantRoomPanel
   m_TagString: Untagged
@@ -1877,10 +1876,10 @@ RectTransform:
   - {fileID: 1488238830}
   m_Father: {fileID: 2117938592}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 1, y: 1}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 0}
+  m_SizeDelta: {x: 720, y: 520}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1261493163
 MonoBehaviour:
@@ -1926,14 +1925,23 @@ MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1261493161}
+  m_GameObject: {fileID: 720000001}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 6f63db66d63b4714cb651d9875f77f18, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  useFixedSceneUi: 1
+  merchantRoomPanel: {fileID: 1261493161}
+  merchantTitleText: {fileID: 1559645288}
+  merchantDialogueText: {fileID: 0}
   playerEnergyStore: {fileID: 2023205760}
+  playerAttack: {fileID: 0}
   energyAbsorbController: {fileID: 2023205766}
+  playerLightController: {fileID: 0}
+  productButton1: {fileID: 1712759125}
+  productButton2: {fileID: 266808867}
+  productButton3: {fileID: 1488238831}
   itemButton1: {fileID: 1712759125}
   itemButton2: {fileID: 266808867}
   itemButton3: {fileID: 1488238831}
@@ -1945,7 +1953,13 @@ MonoBehaviour:
   itemTmpText3: {fileID: 0}
   energyText: {fileID: 0}
   energyTmpText: {fileID: 0}
+  dialogueText: {fileID: 0}
+  dialogueTmpText: {fileID: 0}
+  dialogueBox: {fileID: 0}
+  leaveButton: {fileID: 319197558}
   enterNextCaveButton: {fileID: 319197558}
+  caveLevelGenerator: {fileID: 553435334}
+  lastMethod: 
 --- !u!1 &1370526185
 GameObject:
   m_ObjectHideFlags: 0
@@ -2250,7 +2264,7 @@ GameObject:
   - component: {fileID: 1488238832}
   - component: {fileID: 1488238831}
   m_Layer: 5
-  m_Name: Bigger Absorb
+  m_Name: ProductButton_1
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -2273,8 +2287,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 160, y: 30}
+  m_AnchoredPosition: {x: 0, y: -10}
+  m_SizeDelta: {x: 360, y: 56}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1488238831
 MonoBehaviour:
@@ -2370,7 +2384,7 @@ GameObject:
   - component: {fileID: 1559645289}
   - component: {fileID: 1559645288}
   m_Layer: 5
-  m_Name: Merchant Room
+  m_Name: TitleText
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -2392,8 +2406,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 200, y: 50}
+  m_AnchoredPosition: {x: 0, y: 185}
+  m_SizeDelta: {x: 420, y: 64}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1559645288
 MonoBehaviour:
@@ -2415,7 +2429,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: New Text
+  m_text: Merchant Room
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -2593,7 +2607,7 @@ GameObject:
   - component: {fileID: 1712759126}
   - component: {fileID: 1712759125}
   m_Layer: 5
-  m_Name: Energy Backpack
+  m_Name: ProductButton_3
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -2616,8 +2630,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 160, y: 30}
+  m_AnchoredPosition: {x: 0, y: -150}
+  m_SizeDelta: {x: 360, y: 56}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1712759125
 MonoBehaviour:
@@ -3129,10 +3143,12 @@ RectTransform:
   m_GameObject: {fileID: 2117938588}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1261493162}
+  - {fileID: 910000002}
+  - {fileID: 910000102}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
@@ -3140,6 +3156,76 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0, y: 0}
+--- !u!1 &910000001
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 910000002}
+  m_Layer: 5
+  m_Name: HUDPanel
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &910000002
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 910000001}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 2117938592}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 1, y: 1}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!1 &910000101
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 910000102}
+  m_Layer: 5
+  m_Name: PausePanel
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 0
+--- !u!224 &910000102
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 910000101}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 2117938592}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 520, y: 420}
+  m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &880200001
 GameObject:
   m_ObjectHideFlags: 0
@@ -3244,6 +3330,38 @@ MonoBehaviour:
   spriteRenderer: {fileID: 880200003}
   backgroundZ: 10
   sortingOrder: -100
+--- !u!1 &720000001
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 720000002}
+  - component: {fileID: 1261493165}
+  m_Layer: 0
+  m_Name: MerchantRoomController
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &720000002
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 720000001}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -3257,3 +3375,4 @@ SceneRoots:
   - {fileID: 1936840814}
   - {fileID: 2117938592}
   - {fileID: 272359557}
+  - {fileID: 720000002}
