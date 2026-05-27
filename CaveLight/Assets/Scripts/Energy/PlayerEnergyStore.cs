@@ -59,6 +59,22 @@ public class PlayerEnergyStore : MonoBehaviour
         return hadEnoughEnergy;
     }
 
+    public bool TrySpendEnergy(int amount)
+    {
+        if (amount <= 0)
+        {
+            return true;
+        }
+
+        if (currentEnergy < amount)
+        {
+            return false;
+        }
+
+        SetCurrentEnergy(currentEnergy - amount);
+        return true;
+    }
+
     public void TakeEnergyDamage(float amount)
     {
         if (amount <= 0f)

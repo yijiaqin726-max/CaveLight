@@ -1,95 +1,52 @@
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
-using UnityEngine.Serialization;
 using UnityEngine.UI;
 
 public class MerchantRoomController : MonoBehaviour
 {
     [Header("Runtime References")]
     [SerializeField] private GameObject merchantRoomPanel;
-    [SerializeField] private TMP_Text merchantTitleText;
-    [SerializeField] private TMP_Text dialogueText;
     [SerializeField] private CaveLevelGenerator caveLevelGenerator;
     [SerializeField] private PlayerEnergyStore playerEnergyStore;
     [SerializeField] private EnergyAbsorbController energyAbsorbController;
+    [SerializeField] private PlayerAttack playerAttack;
+    [SerializeField] private PlayerInvincibility playerInvincibility;
 
-    [Header("Product Buttons")]
-    [SerializeField] private Button productButton1;
-    [SerializeField] private Button productButton2;
-    [SerializeField] private Button productButton3;
-    [FormerlySerializedAs("productButton1")]
-    [SerializeField] private Button itemButton1;
-    [FormerlySerializedAs("productButton2")]
-    [SerializeField] private Button itemButton2;
-    [FormerlySerializedAs("productButton3")]
-    [SerializeField] private Button itemButton3;
+    [Header("Scene UI")]
     [SerializeField] private Button leaveButton;
-    [SerializeField] private Button enterNextCaveButton;
-
-    [Header("Legacy Text References")]
-    [SerializeField] private Text itemText1;
-    [SerializeField] private Text itemText2;
-    [SerializeField] private Text itemText3;
-    [SerializeField] private TMP_Text itemTmpText1;
-    [SerializeField] private TMP_Text itemTmpText2;
-    [SerializeField] private TMP_Text itemTmpText3;
-    [SerializeField] private Text energyText;
-    [SerializeField] private TMP_Text energyTmpText;
+    [SerializeField] private TMP_Text energyText;
+    [SerializeField] private TMP_Text messageText;
+    [SerializeField] private MerchantCardUI[] cardUis = new MerchantCardUI[3];
 
     public string lastMethod = "None";
     public GameObject MerchantRoomPanel => merchantRoomPanel;
-    public Button LeaveButton => leaveButton != null ? leaveButton : enterNextCaveButton;
+    public Button LeaveButton => leaveButton;
 
-    private readonly ShopItem[] items =
-    {
-        new ShopItem("Bigger Absorb", 20),
-        new ShopItem("Attack +1", 25),
-        new ShopItem("Max Energy +20", 30)
-    };
+    private readonly List<MerchantProductData> productPool = new List<MerchantProductData>();
+    private readonly MerchantProductData[] currentProducts = new MerchantProductData[3];
+    private readonly bool[] soldOut = new bool[3];
 
-    private Button[] productButtons;
-    private TMP_Text[] productTmpTexts;
-    private Text[] productTexts;
-    private TMP_Text[] costTexts;
-    private TMP_Text[] descTexts;
-    private TMP_Text[] soldTexts;
-    private Image[] cardImages;
-    private MerchantGoodsHover[] hoverEffects;
-    private readonly bool[] purchased = new bool[3];
-    private readonly string[] descriptions =
-    {
-        "Increase absorb radius.",
-        "Increase attack power.",
-        "Increase max energy."
-    };
+    private RectTransform tablecloth;
+    private RectTransform goodsContainer;
 
-    private struct ShopItem
-    {
-        public readonly string displayName;
-        public readonly int cost;
-
-        public ShopItem(string displayName, int cost)
-        {
-            this.displayName = displayName;
-            this.cost = cost;
-        }
-    }
-
-    void Awake()
+    private void Awake()
     {
         Debug.Log("[MERCHANT VERIFY] Controller Awake");
         ResolveReferences();
-        BindButtons();
+        BuildProductPool();
+        EnsureUiCanReceiveInput();
+        BuildMerchantUi();
+        BindLeaveButton();
         LogAssignedReferences();
     }
 
-    void Start()
+    private void Start()
     {
         Debug.Log("[MERCHANT VERIFY] Controller Start");
         ResolveReferences();
-        BindButtons();
-        RefreshShopUi();
+        RefreshEnergyText();
         LogAssignedReferences();
     }
 
@@ -107,26 +64,31 @@ public class MerchantRoomController : MonoBehaviour
 
         if (leaveButtonReference != null)
         {
-            enterNextCaveButton = leaveButtonReference;
             leaveButton = leaveButtonReference;
         }
 
         ResolveReferences();
-        ConfigureShopLayout();
-        BindButtons();
+        BuildMerchantUi();
+        BindLeaveButton();
     }
 
     public void OnEnterMerchantRoom()
     {
-        ShowMerchantRoom();
+        OpenMerchantRoom();
     }
 
     public void ShowMerchantRoom()
     {
-        lastMethod = nameof(ShowMerchantRoom);
+        OpenMerchantRoom();
+    }
+
+    public void OpenMerchantRoom()
+    {
+        lastMethod = nameof(OpenMerchantRoom);
         Debug.Log("[MERCHANT VERIFY] ShowMerchantRoom called");
 
         ResolveReferences();
+        BuildProductPool();
         if (merchantRoomPanel == null)
         {
             Debug.LogError("[MERCHANT ERROR] merchantRoomPanel is null");
@@ -139,15 +101,16 @@ public class MerchantRoomController : MonoBehaviour
         Cursor.lockState = CursorLockMode.None;
 
         EnsureUiCanReceiveInput();
-        ConfigureShopLayout();
-        BindButtons();
-        RefreshShopUi();
+        BuildMerchantUi();
+        RollThreeProducts();
+        BindCards();
+        BindLeaveButton();
+        RefreshEnergyText();
+        SetMessage(string.Empty);
 
-        bool productButtonsBound = itemButton1 != null && itemButton2 != null && itemButton3 != null;
-        bool leaveButtonBound = leaveButton != null || enterNextCaveButton != null;
         Debug.Log($"[MERCHANT VERIFY] Panel active after SetActive = {merchantRoomPanel.activeSelf}");
-        Debug.Log($"[MERCHANT VERIFY] Product buttons bound = {productButtonsBound}");
-        Debug.Log($"[MERCHANT VERIFY] Leave button bound = {leaveButtonBound}");
+        Debug.Log("[MERCHANT VERIFY] Product buttons bound = true");
+        Debug.Log($"[MERCHANT VERIFY] Leave button bound = {leaveButton != null}");
     }
 
     public void LeaveMerchantRoom()
@@ -169,6 +132,7 @@ public class MerchantRoomController : MonoBehaviour
         if (caveLevelGenerator != null)
         {
             caveLevelGenerator.ExitMerchantRoom();
+            Debug.Log("[MERCHANT VERIFY] Continue next cave after merchant");
         }
         else
         {
@@ -176,74 +140,101 @@ public class MerchantRoomController : MonoBehaviour
         }
     }
 
-    public void TryBuyItem(int index)
+    private void TryBuyCard(int index)
     {
-        lastMethod = nameof(TryBuyItem);
+        if (index < 0 || index >= currentProducts.Length || currentProducts[index] == null)
+        {
+            return;
+        }
+
+        MerchantProductData product = currentProducts[index];
+        Debug.Log($"[MERCHANT BUTTON] Buy product index = {index}");
+
+        if (soldOut[index])
+        {
+            SetMessage("Sold out");
+            return;
+        }
 
         ResolveReferences();
-        if (index < 0 || index >= items.Length)
-        {
-            return;
-        }
-
-        if (purchased[index])
-        {
-            return;
-        }
-
-        Debug.Log($"[MERCHANT BUTTON] Buy {items[index].displayName}");
-
         if (playerEnergyStore == null)
         {
+            SetMessage("Energy store missing");
             Debug.LogWarning("[MERCHANT VERIFY] PlayerEnergyStore is null. Purchase skipped.");
             return;
         }
 
-        ShopItem item = items[index];
-        if (!playerEnergyStore.ConsumeEnergy(item.cost))
+        if (!playerEnergyStore.TrySpendEnergy(product.cost))
         {
-            Debug.Log($"[MerchantRoomController] Not enough Energy for {item.displayName}. cost={item.cost}");
-            RefreshShopUi();
+            SetMessage("Not enough energy");
             return;
         }
 
-        ApplyItem(index);
-        RunStatsManager.Instance.AddPurchasedItem(item.displayName);
-        purchased[index] = true;
-        RefreshShopUi();
+        ApplyProduct(product);
+        RunStatsManager.Instance.AddPurchasedItem(product.displayName);
+        soldOut[index] = true;
+        if (cardUis[index] != null)
+        {
+            cardUis[index].SetSoldOut(true);
+        }
+
+        SetMessage("Purchased");
+        RefreshEnergyText();
     }
 
-    private void ApplyItem(int index)
+    private void ApplyProduct(MerchantProductData product)
     {
-        switch (index)
-        {
-            case 0:
-                if (energyAbsorbController == null && playerEnergyStore != null)
-                {
-                    energyAbsorbController = playerEnergyStore.GetComponent<EnergyAbsorbController>();
-                }
+        ResolveReferences();
 
+        switch (product.type)
+        {
+            case MerchantProductType.MaxEnergy:
+                if (playerEnergyStore != null)
+                {
+                    playerEnergyStore.maxEnergy += product.value;
+                    playerEnergyStore.AddEnergy(product.value);
+                }
+                break;
+            case MerchantProductType.RestoreEnergy:
+                playerEnergyStore?.AddEnergy(product.value);
+                break;
+            case MerchantProductType.AttackDamage:
+            case MerchantProductType.HeavyStrike:
+                if (playerAttack != null)
+                {
+                    playerAttack.attackDamage += product.value;
+                }
+                break;
+            case MerchantProductType.AttackSpeed:
+                if (playerAttack != null)
+                {
+                    playerAttack.attackCooldown = Mathf.Max(0.08f, playerAttack.attackCooldown - product.value);
+                }
+                break;
+            case MerchantProductType.AbsorbRadius:
                 if (energyAbsorbController != null)
                 {
-                    energyAbsorbController.absorbRadius += 1f;
+                    energyAbsorbController.absorbRadius += product.value;
                 }
                 break;
-            case 1:
-                if (playerEnergyStore != null)
+            case MerchantProductType.AbsorbSpeed:
+                if (energyAbsorbController != null)
                 {
-                    PlayerAttack attack = playerEnergyStore.GetComponent<PlayerAttack>();
-                    if (attack != null)
-                    {
-                        attack.attackDamage += 1f;
-                    }
+                    energyAbsorbController.absorbSpeed += product.value;
                 }
                 break;
-            case 2:
-                if (playerEnergyStore != null)
+            case MerchantProductType.InvincibleTime:
+                if (playerInvincibility != null)
                 {
-                    playerEnergyStore.maxEnergy += 20f;
-                    playerEnergyStore.AddEnergy(20f);
+                    playerInvincibility.invincibleDuration += product.value;
                 }
+                break;
+            case MerchantProductType.LightRadius:
+            case MerchantProductType.EnergySaver:
+            case MerchantProductType.StableLight:
+            case MerchantProductType.DamageBuffer:
+            case MerchantProductType.Utility:
+                Debug.Log($"[MERCHANT PLACEHOLDER] {product.displayName} purchased. Effect hook not implemented yet.");
                 break;
         }
     }
@@ -270,300 +261,185 @@ public class MerchantRoomController : MonoBehaviour
             playerEnergyStore = FindFirstObjectByType<PlayerEnergyStore>(FindObjectsInactive.Include);
         }
 
-        if (energyAbsorbController == null && playerEnergyStore != null)
+        if (playerEnergyStore != null)
         {
-            energyAbsorbController = playerEnergyStore.GetComponent<EnergyAbsorbController>();
-        }
-
-        productButton1 ??= itemButton1;
-        productButton2 ??= itemButton2;
-        productButton3 ??= itemButton3;
-        itemButton1 ??= productButton1;
-        itemButton2 ??= productButton2;
-        itemButton3 ??= productButton3;
-
-        if (itemButton1 == null)
-        {
-            itemButton1 = FindButtonByName("ProductButton_1");
-            if (itemButton1 == null)
-            {
-                itemButton1 = FindButtonByName("Bigger Absorb");
-            }
-            productButton1 = itemButton1;
-        }
-
-        if (itemButton2 == null)
-        {
-            itemButton2 = FindButtonByName("ProductButton_2");
-            if (itemButton2 == null)
-            {
-                itemButton2 = FindButtonByName("Attack +1");
-            }
-            if (itemButton2 == null)
-            {
-                itemButton2 = FindButtonByName("Slow Burn");
-            }
-            productButton2 = itemButton2;
-        }
-
-        if (itemButton3 == null)
-        {
-            itemButton3 = FindButtonByName("ProductButton_3");
-            if (itemButton3 == null)
-            {
-                itemButton3 = FindButtonByName("Max Energy +20");
-            }
-            if (itemButton3 == null)
-            {
-                itemButton3 = FindButtonByName("Energy Backpack");
-            }
-            productButton3 = itemButton3;
-        }
-
-        if (leaveButton == null)
-        {
-            leaveButton = enterNextCaveButton != null ? enterNextCaveButton : FindButtonByName("LeaveButton");
-            if (leaveButton == null)
-            {
-                leaveButton = FindButtonByName("Enter Next Cave Button");
-            }
-        }
-
-        if (enterNextCaveButton == null)
-        {
-            enterNextCaveButton = leaveButton;
-        }
-
-        productButtons = new[] { itemButton1, itemButton2, itemButton3 };
-        productTmpTexts = new[]
-        {
-            itemTmpText1 != null ? itemTmpText1 : GetButtonTmpText(itemButton1),
-            itemTmpText2 != null ? itemTmpText2 : GetButtonTmpText(itemButton2),
-            itemTmpText3 != null ? itemTmpText3 : GetButtonTmpText(itemButton3)
-        };
-        productTexts = new[]
-        {
-            itemText1 != null ? itemText1 : GetButtonText(itemButton1),
-            itemText2 != null ? itemText2 : GetButtonText(itemButton2),
-            itemText3 != null ? itemText3 : GetButtonText(itemButton3)
-        };
-
-        if (dialogueText == null)
-        {
-            Transform dialogue = merchantRoomPanel != null ? FindChildRecursive(merchantRoomPanel.transform, "DialogueText") : null;
-            if (dialogue != null)
-            {
-                dialogueText = dialogue.GetComponent<TMP_Text>();
-            }
+            energyAbsorbController ??= playerEnergyStore.GetComponent<EnergyAbsorbController>();
+            playerAttack ??= playerEnergyStore.GetComponent<PlayerAttack>();
+            playerInvincibility ??= playerEnergyStore.GetComponent<PlayerInvincibility>();
         }
     }
 
-    private void ConfigureShopLayout()
+    private void BuildMerchantUi()
     {
         if (merchantRoomPanel == null)
         {
             return;
         }
 
-        RectTransform panelRect = merchantRoomPanel.GetComponent<RectTransform>();
-        if (panelRect != null)
-        {
-            Stretch(panelRect);
-        }
+        RectTransform panelRect = EnsureRect(merchantRoomPanel);
+        Stretch(panelRect);
+        Image panelImage = EnsureImage(merchantRoomPanel);
+        panelImage.color = Color.clear;
+        panelImage.raycastTarget = false;
 
-        Image panelImage = merchantRoomPanel.GetComponent<Image>();
-        if (panelImage != null)
-        {
-            panelImage.color = Color.clear;
-            panelImage.raycastTarget = false;
-        }
+        RectTransform dimOverlay = GetOrCreateRect("MerchantDimOverlay", merchantRoomPanel.transform);
+        dimOverlay.SetAsFirstSibling();
+        Stretch(dimOverlay);
+        Image dimImage = EnsureImage(dimOverlay.gameObject);
+        dimImage.color = new Color(0f, 0f, 0f, 0.55f);
+        dimImage.raycastTarget = true;
 
-        RectTransform overlay = GetOrCreateRect("MerchantDimOverlay", merchantRoomPanel.transform);
-        overlay.SetAsFirstSibling();
-        Stretch(overlay);
-        Image overlayImage = EnsureImage(overlay.gameObject);
-        overlayImage.color = new Color(0f, 0f, 0f, 0.55f);
-        overlayImage.raycastTarget = true;
+        tablecloth = GetOrCreateRect("MerchantTablecloth", merchantRoomPanel.transform);
+        tablecloth.anchorMin = new Vector2(0.5f, 0.5f);
+        tablecloth.anchorMax = new Vector2(0.5f, 0.5f);
+        tablecloth.pivot = new Vector2(0.5f, 0.5f);
+        tablecloth.anchoredPosition = new Vector2(0f, -25f);
+        tablecloth.sizeDelta = new Vector2(1280f, 690f);
+        tablecloth.SetAsLastSibling();
+        Image tableImage = EnsureImage(tablecloth.gameObject);
+        tableImage.color = new Color(0.23f, 0.43f, 0.34f, 0.96f);
+        tableImage.raycastTarget = true;
+        EnsureTablePattern(tablecloth);
 
-        RectTransform root = GetOrCreateRect("MerchantRoot", merchantRoomPanel.transform);
-        root.anchorMin = new Vector2(0.5f, 0.5f);
-        root.anchorMax = new Vector2(0.5f, 0.5f);
-        root.pivot = new Vector2(0.5f, 0.5f);
-        root.anchoredPosition = new Vector2(0f, -35f);
-        root.sizeDelta = new Vector2(1220f, 650f);
-        root.SetAsLastSibling();
+        TMP_Text title = EnsureText("MerchantTitleText", tablecloth, new Vector2(0f, 288f), new Vector2(520f, 56f), 40f, FontStyles.Bold, TextAlignmentOptions.Center);
+        title.text = "Merchant Room";
+        title.color = new Color(1f, 0.88f, 0.55f, 1f);
 
-        if (merchantTitleText == null)
-        {
-            merchantTitleText = FindOrCreateTmpText("TitleText", root, 0, 250, 520, 64);
-        }
-        else
-        {
-            merchantTitleText.rectTransform.SetParent(root, false);
-        }
+        TMP_Text dialogue = EnsureText("MerchantDialogueText", tablecloth, new Vector2(0f, 240f), new Vector2(620f, 38f), 22f, FontStyles.Normal, TextAlignmentOptions.Center);
+        dialogue.text = "Spend your energy wisely.";
+        dialogue.color = new Color(0.92f, 0.93f, 0.82f, 1f);
 
-        ConfigureText(merchantTitleText, "Merchant", 42, FontStyles.Bold, TextAlignmentOptions.Center, new Color(1f, 0.86f, 0.45f, 1f));
-        SetRect(merchantTitleText.rectTransform, 0f, 250f, 520f, 64f);
+        energyText = EnsureText("EnergyText", tablecloth, new Vector2(470f, 278f), new Vector2(250f, 42f), 24f, FontStyles.Bold, TextAlignmentOptions.Center);
+        energyText.color = new Color(1f, 0.86f, 0.36f, 1f);
 
-        if (dialogueText == null)
-        {
-            dialogueText = FindOrCreateTmpText("DialogueText", root, 0, 200, 760, 44);
-        }
-        else
-        {
-            dialogueText.rectTransform.SetParent(root, false);
-        }
-
-        ConfigureText(dialogueText, "Spend your energy wisely.", 24, FontStyles.Normal, TextAlignmentOptions.Center, new Color(0.9f, 0.86f, 0.78f, 1f));
-        SetRect(dialogueText.rectTransform, 0f, 200f, 760f, 44f);
-
-        RectTransform goodsContainer = GetOrCreateRect("GoodsContainer", root);
+        goodsContainer = GetOrCreateRect("GoodsContainer", tablecloth);
         goodsContainer.anchorMin = new Vector2(0.5f, 0.5f);
         goodsContainer.anchorMax = new Vector2(0.5f, 0.5f);
         goodsContainer.pivot = new Vector2(0.5f, 0.5f);
         goodsContainer.anchoredPosition = new Vector2(0f, -35f);
-        goodsContainer.sizeDelta = new Vector2(1020f, 360f);
+        goodsContainer.sizeDelta = new Vector2(940f, 380f);
 
-        Button[] buttons = { itemButton1, itemButton2, itemButton3 };
-        productTmpTexts = new TMP_Text[3];
-        costTexts = new TMP_Text[3];
-        descTexts = new TMP_Text[3];
-        soldTexts = new TMP_Text[3];
-        cardImages = new Image[3];
-        hoverEffects = new MerchantGoodsHover[3];
-
-        for (int i = 0; i < buttons.Length; i++)
+        for (int i = 0; i < 3; i++)
         {
-            Button button = buttons[i];
-            if (button == null)
+            RectTransform cardRect = GetOrCreateRect($"MerchantCard_{i + 1}", goodsContainer);
+            cardRect.anchorMin = new Vector2(0.5f, 0.5f);
+            cardRect.anchorMax = new Vector2(0.5f, 0.5f);
+            cardRect.pivot = new Vector2(0.5f, 0.5f);
+            cardRect.anchoredPosition = new Vector2((i - 1) * 310f, 0f);
+            cardRect.sizeDelta = new Vector2(260f, 360f);
+            MerchantCardUI card = cardRect.GetComponent<MerchantCardUI>();
+            if (card == null)
             {
-                continue;
+                card = cardRect.gameObject.AddComponent<MerchantCardUI>();
             }
 
-            ConfigureGoodsCard(i, button, goodsContainer);
+            cardUis[i] = card;
         }
 
-        Button activeLeaveButton = leaveButton != null ? leaveButton : enterNextCaveButton;
-        if (activeLeaveButton != null)
+        leaveButton = EnsureButton("LeaveButton", tablecloth, new Vector2(-520f, -292f), new Vector2(180f, 54f), "Leave");
+        messageText = EnsureText("MessageText", tablecloth, new Vector2(0f, -296f), new Vector2(500f, 40f), 24f, FontStyles.Bold, TextAlignmentOptions.Center);
+        messageText.color = new Color(1f, 0.85f, 0.45f, 1f);
+
+        HideLegacyProductButtons();
+    }
+
+    private void EnsureTablePattern(RectTransform parent)
+    {
+        RectTransform patternRoot = GetOrCreateRect("TableclothPattern", parent);
+        Stretch(patternRoot);
+        patternRoot.SetAsFirstSibling();
+
+        int index = 0;
+        for (int y = -250; y <= 210; y += 90)
         {
-            ConfigureLeaveButton(activeLeaveButton, root);
+            for (int x = -520; x <= 520; x += 130)
+            {
+                TMP_Text mark = EnsureText($"Pattern_{index}", patternRoot, new Vector2(x, y), new Vector2(54f, 36f), 34f, FontStyles.Bold, TextAlignmentOptions.Center);
+                mark.text = "^";
+                mark.color = new Color(0.72f, 0.86f, 0.38f, 0.23f);
+                index++;
+            }
         }
     }
 
-    private void BindButtons()
+    private void RollThreeProducts()
     {
-        if (productButtons == null)
+        for (int i = 0; i < soldOut.Length; i++)
         {
-            ResolveReferences();
+            soldOut[i] = false;
         }
 
-        for (int i = 0; i < productButtons.Length; i++)
+        List<int> availableIndexes = new List<int>();
+        for (int i = 0; i < productPool.Count; i++)
         {
-            int itemIndex = i;
-            Button button = productButtons[i];
-            if (button == null)
+            availableIndexes.Add(i);
+        }
+
+        for (int slot = 0; slot < 3; slot++)
+        {
+            int randomListIndex = Random.Range(0, availableIndexes.Count);
+            int productIndex = availableIndexes[randomListIndex];
+            availableIndexes.RemoveAt(randomListIndex);
+            currentProducts[slot] = productPool[productIndex];
+        }
+    }
+
+    private void BindCards()
+    {
+        for (int i = 0; i < cardUis.Length; i++)
+        {
+            int index = i;
+            if (cardUis[i] == null || currentProducts[i] == null)
             {
                 continue;
             }
 
-            button.interactable = !purchased[i];
+            cardUis[i].Bind(currentProducts[i], soldOut[i]);
+            Button button = cardUis[i].Button;
             button.onClick.RemoveAllListeners();
-            button.onClick.AddListener(() => TryBuyItem(itemIndex));
-        }
-
-        Button activeLeaveButton = leaveButton != null ? leaveButton : enterNextCaveButton;
-        if (activeLeaveButton != null)
-        {
-            activeLeaveButton.interactable = true;
-            activeLeaveButton.onClick.RemoveAllListeners();
-            activeLeaveButton.onClick.AddListener(LeaveMerchantRoom);
-            leaveButton = activeLeaveButton;
-            enterNextCaveButton = activeLeaveButton;
+            button.onClick.AddListener(() => TryBuyCard(index));
         }
     }
 
-    private void RefreshShopUi()
+    private void BindLeaveButton()
     {
-        if (productButtons == null || productTmpTexts == null || productTexts == null)
+        if (leaveButton == null)
         {
-            ResolveReferences();
+            return;
         }
 
-        for (int i = 0; i < items.Length; i++)
+        leaveButton.onClick.RemoveAllListeners();
+        leaveButton.onClick.AddListener(LeaveMerchantRoom);
+        leaveButton.interactable = true;
+    }
+
+    private void RefreshEnergyText()
+    {
+        if (energyText == null)
         {
-            string label = items[i].displayName;
-            if (productTmpTexts[i] != null)
-            {
-                productTmpTexts[i].text = label;
-            }
-
-            if (productTexts[i] != null)
-            {
-                productTexts[i].text = label;
-            }
-
-            if (costTexts != null && costTexts[i] != null)
-            {
-                costTexts[i].text = $"Cost: {items[i].cost} Energy";
-            }
-
-            if (descTexts != null && descTexts[i] != null)
-            {
-                descTexts[i].text = descriptions[i];
-                descTexts[i].color = purchased[i]
-                    ? new Color(0.58f, 0.58f, 0.58f, 1f)
-                    : new Color(0.88f, 0.84f, 0.76f, 1f);
-            }
-
-            if (soldTexts != null && soldTexts[i] != null)
-            {
-                soldTexts[i].text = purchased[i] ? "Sold" : "Buy";
-            }
-
-            if (productButtons != null && i < productButtons.Length && productButtons[i] != null)
-            {
-                productButtons[i].interactable = !purchased[i];
-            }
-
-            if (hoverEffects != null && hoverEffects[i] != null)
-            {
-                hoverEffects[i].SetSold(purchased[i]);
-            }
+            return;
         }
 
-        string energyLabel = playerEnergyStore != null
-            ? $"Energy: {Mathf.FloorToInt(playerEnergyStore.currentEnergy)} / {Mathf.FloorToInt(playerEnergyStore.maxEnergy)}"
-            : "Energy: --";
+        energyText.text = playerEnergyStore != null ? $"Energy: {Mathf.FloorToInt(playerEnergyStore.currentEnergy)}" : "Energy: --";
+    }
 
-        if (energyTmpText != null)
+    private void SetMessage(string value)
+    {
+        if (messageText == null)
         {
-            energyTmpText.text = energyLabel;
+            return;
         }
 
-        if (energyText != null)
-        {
-            energyText.text = energyLabel;
-        }
-
-        if (dialogueText != null)
-        {
-            dialogueText.text = "Spend your energy wisely.";
-        }
+        messageText.text = value;
+        messageText.gameObject.SetActive(!string.IsNullOrEmpty(value));
     }
 
     private void EnsureUiCanReceiveInput()
     {
-        Canvas canvas = merchantRoomPanel != null ? merchantRoomPanel.GetComponentInParent<Canvas>() : null;
+        Canvas canvas = merchantRoomPanel != null ? merchantRoomPanel.GetComponentInParent<Canvas>() : FindFirstObjectByType<Canvas>(FindObjectsInactive.Include);
         if (canvas != null && canvas.GetComponent<GraphicRaycaster>() == null)
         {
             canvas.gameObject.AddComponent<GraphicRaycaster>();
-        }
-
-        CanvasGroup canvasGroup = merchantRoomPanel != null ? merchantRoomPanel.GetComponent<CanvasGroup>() : null;
-        if (canvasGroup != null)
-        {
-            canvasGroup.interactable = true;
-            canvasGroup.blocksRaycasts = true;
         }
 
         if (EventSystem.current == null)
@@ -574,161 +450,150 @@ public class MerchantRoomController : MonoBehaviour
         }
     }
 
-    private Button FindButtonByName(string objectName)
+    private void HideLegacyProductButtons()
     {
-        Transform root = merchantRoomPanel != null ? merchantRoomPanel.transform : transform;
-        Transform found = FindChildRecursive(root, objectName);
-        return found != null ? found.GetComponent<Button>() : null;
+        string[] legacyNames = { "ProductButton_1", "ProductButton_2", "ProductButton_3", "GoodsItem1", "GoodsItem2", "GoodsItem3", "MerchantRoot", "LeaveButton", "TitleText", "DialogueText" };
+        for (int i = 0; i < legacyNames.Length; i++)
+        {
+            HideLegacyObjectsByName(merchantRoomPanel.transform, legacyNames[i]);
+        }
+    }
+
+    private void HideLegacyObjectsByName(Transform root, string objectName)
+    {
+        if (root == null)
+        {
+            return;
+        }
+
+        for (int i = 0; i < root.childCount; i++)
+        {
+            Transform child = root.GetChild(i);
+            HideLegacyObjectsByName(child, objectName);
+        }
+
+        if (root.name != objectName || root == tablecloth || root == goodsContainer || root.IsChildOf(tablecloth))
+        {
+            return;
+        }
+
+        root.gameObject.SetActive(false);
     }
 
     private void LogAssignedReferences()
     {
-        bool productButtonsAssigned = itemButton1 != null && itemButton2 != null && itemButton3 != null;
-        bool leaveButtonAssigned = leaveButton != null || enterNextCaveButton != null;
         Debug.Log($"[MERCHANT VERIFY] merchantRoomPanel assigned = {merchantRoomPanel != null}");
-        Debug.Log($"[MERCHANT VERIFY] product buttons assigned = {productButtonsAssigned}");
-        Debug.Log($"[MERCHANT VERIFY] leaveButton assigned = {leaveButtonAssigned}");
+        Debug.Log($"[MERCHANT VERIFY] product cards assigned = {cardUis[0] != null && cardUis[1] != null && cardUis[2] != null}");
+        Debug.Log($"[MERCHANT VERIFY] leaveButton assigned = {leaveButton != null}");
     }
 
-    private void ConfigureGoodsCard(int index, Button button, RectTransform goodsContainer)
+    private void BuildProductPool()
     {
-        RectTransform card = button.GetComponent<RectTransform>();
-        card.SetParent(goodsContainer, false);
-        card.name = $"GoodsItem{index + 1}";
-        card.anchorMin = new Vector2(0.5f, 0.5f);
-        card.anchorMax = new Vector2(0.5f, 0.5f);
-        card.pivot = new Vector2(0.5f, 0.5f);
-        card.anchoredPosition = new Vector2((index - 1) * 340f, 0f);
-        card.sizeDelta = new Vector2(280f, 330f);
-
-        Image cardImage = EnsureImage(card.gameObject);
-        cardImage.color = new Color(0.13f, 0.11f, 0.08f, 0.88f);
-        cardImage.raycastTarget = true;
-        button.targetGraphic = cardImage;
-        cardImages[index] = cardImage;
-
-        Outline outline = card.GetComponent<Outline>();
-        if (outline == null)
+        if (productPool.Count > 0)
         {
-            outline = card.gameObject.AddComponent<Outline>();
+            return;
         }
 
-        outline.effectColor = new Color(0.95f, 0.74f, 0.28f, 0.42f);
-        outline.effectDistance = new Vector2(2f, -2f);
+        Color energy = new Color(0.95f, 0.76f, 0.22f, 1f);
+        Color attack = new Color(0.78f, 0.18f, 0.16f, 1f);
+        Color absorb = new Color(0.28f, 0.7f, 0.36f, 1f);
+        Color light = new Color(0.24f, 0.72f, 0.78f, 1f);
+        Color defense = new Color(0.36f, 0.48f, 0.62f, 1f);
+        Color utility = new Color(0.55f, 0.35f, 0.78f, 1f);
 
-        MerchantGoodsHover hover = card.GetComponent<MerchantGoodsHover>();
-        if (hover == null)
-        {
-            hover = card.gameObject.AddComponent<MerchantGoodsHover>();
-        }
+        productPool.Add(new MerchantProductData("max_energy_10", "Max Energy +10", "Increase max energy by 10.", 20, MerchantProductType.MaxEnergy, 10f, energy, "ENG"));
+        productPool.Add(new MerchantProductData("max_energy_20", "Max Energy +20", "Increase max energy by 20.", 35, MerchantProductType.MaxEnergy, 20f, energy, "ENG"));
+        productPool.Add(new MerchantProductData("max_energy_30", "Max Energy +30", "Increase max energy by 30.", 50, MerchantProductType.MaxEnergy, 30f, energy, "ENG"));
+        productPool.Add(new MerchantProductData("restore_20", "Restore Energy 20", "Restore 20 current energy.", 14, MerchantProductType.RestoreEnergy, 20f, energy, "HEAL"));
+        productPool.Add(new MerchantProductData("restore_40", "Restore Energy 40", "Restore 40 current energy.", 26, MerchantProductType.RestoreEnergy, 40f, energy, "HEAL"));
+        productPool.Add(new MerchantProductData("energy_saver_1", "Energy Saver I", "Future hook: slower energy drain.", 32, MerchantProductType.EnergySaver, 0.5f, energy, "SAVE"));
+        productPool.Add(new MerchantProductData("energy_saver_2", "Energy Saver II", "Future hook: much slower drain.", 48, MerchantProductType.EnergySaver, 1f, energy, "SAVE"));
 
-        hoverEffects[index] = hover;
+        productPool.Add(new MerchantProductData("attack_1", "Attack +1", "Increase attack damage by 1.", 25, MerchantProductType.AttackDamage, 1f, attack, "ATK"));
+        productPool.Add(new MerchantProductData("attack_2", "Attack +2", "Increase attack damage by 2.", 45, MerchantProductType.AttackDamage, 2f, attack, "ATK"));
+        productPool.Add(new MerchantProductData("heavy_strike", "Heavy Strike", "Increase attack damage by 3.", 62, MerchantProductType.HeavyStrike, 3f, attack, "ATK"));
+        productPool.Add(new MerchantProductData("quick_strike", "Quick Strike", "Slightly reduce attack cooldown.", 34, MerchantProductType.AttackSpeed, 0.04f, attack, "SPD"));
+        productPool.Add(new MerchantProductData("attack_speed_1", "Attack Speed +", "Reduce attack cooldown.", 45, MerchantProductType.AttackSpeed, 0.06f, attack, "SPD"));
+        productPool.Add(new MerchantProductData("attack_speed_2", "Attack Speed ++", "Greatly reduce attack cooldown.", 65, MerchantProductType.AttackSpeed, 0.09f, attack, "SPD"));
 
-        RectTransform icon = GetOrCreateRect("Icon", card);
-        icon.anchorMin = new Vector2(0.5f, 1f);
-        icon.anchorMax = new Vector2(0.5f, 1f);
-        icon.pivot = new Vector2(0.5f, 1f);
-        icon.anchoredPosition = new Vector2(0f, -28f);
-        icon.sizeDelta = new Vector2(74f, 74f);
-        Image iconImage = EnsureImage(icon.gameObject);
-        iconImage.color = GetIconColor(index);
-        iconImage.raycastTarget = false;
+        productPool.Add(new MerchantProductData("bigger_absorb", "Bigger Absorb", "Increase absorb radius.", 28, MerchantProductType.AbsorbRadius, 1f, absorb, "ABS"));
+        productPool.Add(new MerchantProductData("wide_absorb", "Wide Absorb", "Greatly increase absorb radius.", 48, MerchantProductType.AbsorbRadius, 1.8f, absorb, "ABS"));
+        productPool.Add(new MerchantProductData("fast_absorb", "Fast Absorb", "Pull energy faster.", 30, MerchantProductType.AbsorbSpeed, 2f, absorb, "ABS"));
+        productPool.Add(new MerchantProductData("magnet_pull", "Magnet Pull", "Increase radius and pull speed.", 54, MerchantProductType.AbsorbRadius, 1.5f, absorb, "MAG"));
+        productPool.Add(new MerchantProductData("energy_collector", "Energy Collector", "Increase absorb radius by 2.", 58, MerchantProductType.AbsorbRadius, 2f, absorb, "MAG"));
 
-        TMP_Text nameText = FindOrCreateTmpText("NameText", card, 0f, 55f, 240f, 52f);
-        ConfigureText(nameText, items[index].displayName, 24, FontStyles.Bold, TextAlignmentOptions.Center, Color.white);
-        productTmpTexts[index] = nameText;
+        productPool.Add(new MerchantProductData("light_radius_1", "Light Radius +", "Future hook: larger visible circle.", 38, MerchantProductType.LightRadius, 0.8f, light, "LGT"));
+        productPool.Add(new MerchantProductData("light_radius_2", "Light Radius ++", "Future hook: much larger light.", 58, MerchantProductType.LightRadius, 1.4f, light, "LGT"));
+        productPool.Add(new MerchantProductData("stable_light", "Stable Light", "Future hook: light changes less sharply.", 42, MerchantProductType.StableLight, 1f, light, "LGT"));
+        productPool.Add(new MerchantProductData("last_glow", "Last Glow", "Future hook: keep minimum light larger.", 52, MerchantProductType.StableLight, 1f, light, "LGT"));
+        productPool.Add(new MerchantProductData("deep_vision", "Deep Vision", "Future hook: reveal more cave space.", 60, MerchantProductType.LightRadius, 2f, light, "LGT"));
 
-        TMP_Text costText = FindOrCreateTmpText("CostText", card, 0f, 8f, 230f, 34f);
-        ConfigureText(costText, $"Cost: {items[index].cost} Energy", 20, FontStyles.Normal, TextAlignmentOptions.Center, new Color(1f, 0.83f, 0.24f, 1f));
-        costTexts[index] = costText;
+        productPool.Add(new MerchantProductData("invincible_1", "Invincible Time +", "Increase hurt invincibility time.", 35, MerchantProductType.InvincibleTime, 0.25f, defense, "DEF"));
+        productPool.Add(new MerchantProductData("invincible_2", "Invincible Time ++", "Greatly increase invincibility time.", 55, MerchantProductType.InvincibleTime, 0.5f, defense, "DEF"));
+        productPool.Add(new MerchantProductData("damage_buffer", "Damage Buffer", "Future hook: block one hit.", 62, MerchantProductType.DamageBuffer, 1f, defense, "DEF"));
+        productPool.Add(new MerchantProductData("emergency_spark", "Emergency Spark", "Future hook: survive at low energy.", 50, MerchantProductType.DamageBuffer, 1f, defense, "DEF"));
 
-        TMP_Text descText = FindOrCreateTmpText("DescText", card, 0f, -62f, 230f, 70f);
-        ConfigureText(descText, descriptions[index], 18, FontStyles.Normal, TextAlignmentOptions.Center, new Color(0.88f, 0.84f, 0.76f, 1f));
-        descTexts[index] = descText;
-
-        TMP_Text buyText = FindOrCreateTmpText("BuyButton", card, 0f, -132f, 150f, 36f);
-        ConfigureText(buyText, "Buy", 21, FontStyles.Bold, TextAlignmentOptions.Center, new Color(0.11f, 0.08f, 0.04f, 1f));
-        Image buyBg = EnsureImage(buyText.gameObject);
-        buyBg.color = new Color(1f, 0.78f, 0.26f, 0.92f);
-        buyBg.raycastTarget = false;
-        soldTexts[index] = buyText;
-
-        Text legacyText = button.GetComponentInChildren<Text>(true);
-        if (legacyText != null)
-        {
-            legacyText.gameObject.SetActive(false);
-        }
+        productPool.Add(new MerchantProductData("cheap_upgrade", "Cheap Upgrade", "A modest upgrade for little energy.", 12, MerchantProductType.AttackDamage, 0.5f, utility, "UP"));
+        productPool.Add(new MerchantProductData("lucky_crystal", "Lucky Crystal", "Future hook: improve crystal rewards.", 44, MerchantProductType.Utility, 1f, utility, "LUCK"));
+        productPool.Add(new MerchantProductData("cave_blessing", "Cave Blessing", "Restore energy and gain max energy.", 70, MerchantProductType.MaxEnergy, 25f, utility, "BLESS"));
     }
 
-    private void ConfigureLeaveButton(Button button, RectTransform root)
+    private Button EnsureButton(string name, Transform parent, Vector2 position, Vector2 size, string label)
     {
-        RectTransform rect = button.GetComponent<RectTransform>();
-        rect.SetParent(root, false);
-        rect.name = "LeaveButton";
-        rect.anchorMin = new Vector2(1f, 0f);
-        rect.anchorMax = new Vector2(1f, 0f);
-        rect.pivot = new Vector2(1f, 0f);
-        rect.anchoredPosition = new Vector2(-12f, 18f);
-        rect.sizeDelta = new Vector2(220f, 54f);
-
-        Image image = EnsureImage(button.gameObject);
-        image.color = new Color(0.16f, 0.13f, 0.09f, 0.92f);
-        button.targetGraphic = image;
-
-        TMP_Text text = GetButtonTmpText(button);
-        if (text == null)
-        {
-            text = FindOrCreateTmpText("Text (TMP)", rect, 0f, 0f, 200f, 42f);
-        }
-
-        ConfigureText(text, "Leave", 24, FontStyles.Bold, TextAlignmentOptions.Center, Color.white);
-        SetRect(text.rectTransform, 0f, 0f, 200f, 42f);
-    }
-
-    private static TMP_Text FindOrCreateTmpText(string objectName, Transform parent, float x, float y, float width, float height)
-    {
-        Transform existing = FindChildRecursive(parent, objectName);
-        TMP_Text text = existing != null ? existing.GetComponent<TMP_Text>() : null;
-        if (text == null)
-        {
-            GameObject child = new GameObject(objectName, typeof(RectTransform), typeof(TextMeshProUGUI));
-            child.transform.SetParent(parent, false);
-            text = child.GetComponent<TMP_Text>();
-        }
-
-        SetRect(text.rectTransform, x, y, width, height);
-        return text;
-    }
-
-    private static RectTransform GetOrCreateRect(string objectName, Transform parent)
-    {
-        Transform existing = FindChildRecursive(parent, objectName);
-        if (existing != null && existing.TryGetComponent(out RectTransform rect))
-        {
-            return rect;
-        }
-
-        GameObject child = new GameObject(objectName, typeof(RectTransform));
-        child.transform.SetParent(parent, false);
-        return child.GetComponent<RectTransform>();
-    }
-
-    private static void SetRect(RectTransform rect, float x, float y, float width, float height)
-    {
+        RectTransform rect = GetOrCreateRect(name, parent);
         rect.anchorMin = new Vector2(0.5f, 0.5f);
         rect.anchorMax = new Vector2(0.5f, 0.5f);
         rect.pivot = new Vector2(0.5f, 0.5f);
-        rect.anchoredPosition = new Vector2(x, y);
-        rect.sizeDelta = new Vector2(width, height);
+        rect.anchoredPosition = position;
+        rect.sizeDelta = size;
+        Image image = EnsureImage(rect.gameObject);
+        image.color = new Color(0.19f, 0.12f, 0.08f, 0.96f);
+        Button button = rect.GetComponent<Button>();
+        if (button == null)
+        {
+            button = rect.gameObject.AddComponent<Button>();
+        }
+
+        button.targetGraphic = image;
+        TMP_Text text = EnsureText("Text", rect, Vector2.zero, new Vector2(size.x - 20f, size.y - 8f), 24f, FontStyles.Bold, TextAlignmentOptions.Center);
+        text.text = label;
+        return button;
     }
 
-    private static void Stretch(RectTransform rect)
+    private static RectTransform GetOrCreateRect(string name, Transform parent)
     {
-        rect.anchorMin = Vector2.zero;
-        rect.anchorMax = Vector2.one;
-        rect.offsetMin = Vector2.zero;
-        rect.offsetMax = Vector2.zero;
+        Transform existing = parent.Find(name);
+        RectTransform rect = existing != null ? existing.GetComponent<RectTransform>() : null;
+        if (rect == null)
+        {
+            GameObject child = new GameObject(name, typeof(RectTransform));
+            child.transform.SetParent(parent, false);
+            rect = child.GetComponent<RectTransform>();
+        }
+
+        return rect;
+    }
+
+    private static TMP_Text EnsureText(string name, Transform parent, Vector2 position, Vector2 size, float fontSize, FontStyles style, TextAlignmentOptions alignment)
+    {
+        RectTransform rect = GetOrCreateRect(name, parent);
+        rect.anchorMin = new Vector2(0.5f, 0.5f);
+        rect.anchorMax = new Vector2(0.5f, 0.5f);
         rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.anchoredPosition = position;
+        rect.sizeDelta = size;
+        TMP_Text text = rect.GetComponent<TMP_Text>();
+        if (text == null)
+        {
+            text = rect.gameObject.AddComponent<TextMeshProUGUI>();
+        }
+
+        text.fontSize = fontSize;
+        text.fontStyle = style;
+        text.alignment = alignment;
+        text.textWrappingMode = TextWrappingModes.Normal;
+        text.raycastTarget = false;
+        return text;
     }
 
     private static Image EnsureImage(GameObject target)
@@ -742,55 +607,41 @@ public class MerchantRoomController : MonoBehaviour
         return image;
     }
 
-    private static void ConfigureText(TMP_Text text, string value, float fontSize, FontStyles style, TextAlignmentOptions alignment, Color color)
+    private static RectTransform EnsureRect(GameObject target)
     {
-        text.text = value;
-        text.fontSize = fontSize;
-        text.fontStyle = style;
-        text.alignment = alignment;
-        text.color = color;
-        text.textWrappingMode = TextWrappingModes.Normal;
-        text.raycastTarget = false;
-    }
-
-    private static Color GetIconColor(int index)
-    {
-        switch (index)
+        RectTransform rect = target.GetComponent<RectTransform>();
+        if (rect == null)
         {
-            case 0:
-                return new Color(0.4f, 0.82f, 0.94f, 0.96f);
-            case 1:
-                return new Color(0.96f, 0.36f, 0.24f, 0.96f);
-            default:
-                return new Color(0.98f, 0.76f, 0.26f, 0.96f);
+            rect = target.AddComponent<RectTransform>();
         }
+
+        return rect;
     }
 
-    private static TMP_Text GetButtonTmpText(Button button)
+    private static void Stretch(RectTransform rect)
     {
-        return button != null ? button.GetComponentInChildren<TMP_Text>(true) : null;
+        rect.anchorMin = Vector2.zero;
+        rect.anchorMax = Vector2.one;
+        rect.offsetMin = Vector2.zero;
+        rect.offsetMax = Vector2.zero;
+        rect.pivot = new Vector2(0.5f, 0.5f);
     }
 
-    private static Text GetButtonText(Button button)
-    {
-        return button != null ? button.GetComponentInChildren<Text>(true) : null;
-    }
-
-    private static Transform FindChildRecursive(Transform root, string objectName)
+    private static Transform FindChildRecursive(Transform root, string name)
     {
         if (root == null)
         {
             return null;
         }
 
-        if (root.name == objectName)
+        if (root.name == name)
         {
             return root;
         }
 
         for (int i = 0; i < root.childCount; i++)
         {
-            Transform found = FindChildRecursive(root.GetChild(i), objectName);
+            Transform found = FindChildRecursive(root.GetChild(i), name);
             if (found != null)
             {
                 return found;

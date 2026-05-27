@@ -118,8 +118,9 @@ public class CaveEnergyNode : MonoBehaviour, IDamageable
         SpriteRenderer spriteRenderer = energy.GetComponent<SpriteRenderer>();
         if (spriteRenderer != null)
         {
-            spriteRenderer.sortingOrder = 25;
+            spriteRenderer.sortingOrder = 950;
             spriteRenderer.color = new Color(1f, 0.92f, 0.35f, 1f);
+            Debug.Log("[ORDER VERIFY] EnergyPickup order = 950");
         }
 
         if (energy.GetComponent<EnergyPickup>() == null)

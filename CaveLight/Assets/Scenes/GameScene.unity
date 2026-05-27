@@ -3001,7 +3001,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   attackDamage: 1
-  attackCooldown: 0.4
+  attackCooldown: 0.25
   attackRange: 1.2
   attackRadius: 1.1
   attackCenterOffset: {x: 0.35, y: -0.2}

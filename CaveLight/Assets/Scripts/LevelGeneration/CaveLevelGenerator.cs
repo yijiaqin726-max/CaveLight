@@ -584,7 +584,7 @@ public class CaveLevelGenerator : MonoBehaviour
 
         currentExit = Instantiate(exitPrefab, exitWorldPos, Quaternion.identity, levelObjectsRoot);
         currentExit.name = "ExitPlaceholder";
-        SetupImportantSpriteRenderer(currentExit, 999);
+        SetupImportantSpriteRenderer(currentExit, 900);
 
         SpriteRenderer spriteRenderer = currentExit.GetComponent<SpriteRenderer>();
         if (spriteRenderer != null)
@@ -646,7 +646,7 @@ public class CaveLevelGenerator : MonoBehaviour
             Vector3 worldPos = wallTilemap.GetCellCenterWorld(nodeCell);
             GameObject node = Instantiate(caveEnergyNodePrefab, worldPos, Quaternion.identity, levelObjectsRoot);
             node.name = "CaveEnergyNodePlaceholder";
-            SetupImportantSpriteRenderer(node, 999);
+            SetupImportantSpriteRenderer(node, 900);
             occupiedStablePlatformIndices.Add(candidateIndices[i]);
 
             if (node.GetComponent<CaveEnergyNode>() == null)
@@ -798,6 +798,14 @@ public class CaveLevelGenerator : MonoBehaviour
         }
 
         Debug.Log($"[CaveLevelGenerator] SetupImportantSpriteRenderer object={instance.name}, sortingOrder={spriteRenderer.sortingOrder}");
+        if (instance.GetComponent<CaveEnergyNode>() != null)
+        {
+            Debug.Log("[ORDER VERIFY] CaveEnergyNode order = 900");
+        }
+        else if (instance.name.Contains("Exit"))
+        {
+            Debug.Log("[ORDER VERIFY] ExitPlaceholder order = 900");
+        }
     }
 
     private static bool SortingLayerExists(string sortingLayerName)
@@ -1167,8 +1175,9 @@ public class CaveLevelGenerator : MonoBehaviour
         {
             spriteRenderer.enabled = true;
             spriteRenderer.sortingLayerName = "Gameplay";
-            spriteRenderer.sortingOrder = 8;
+            spriteRenderer.sortingOrder = 20;
             spriteRenderer.color = new Color(0.9f, 0.15f, 1f, 1f);
+            Debug.Log("[ORDER VERIFY] Monster order = 20");
         }
         else
         {
@@ -2348,7 +2357,7 @@ public class CaveLevelGenerator : MonoBehaviour
 
         currentExit = Instantiate(exitPrefab, exitWorldPos, Quaternion.identity, levelObjectsRoot);
         currentExit.name = "ExitPlaceholder";
-        SetupImportantSpriteRenderer(currentExit, 999);
+        SetupImportantSpriteRenderer(currentExit, 900);
 
         SpriteRenderer spriteRenderer = currentExit.GetComponent<SpriteRenderer>();
         if (spriteRenderer != null)
@@ -2444,7 +2453,7 @@ public class CaveLevelGenerator : MonoBehaviour
 
             GameObject node = Instantiate(caveEnergyNodePrefab, worldPos, Quaternion.identity, levelObjectsRoot);
             node.name = "CaveEnergyNodePlaceholder";
-            SetupImportantSpriteRenderer(node, 999);
+            SetupImportantSpriteRenderer(node, 900);
 
             if (node.GetComponent<CaveEnergyNode>() == null)
             {

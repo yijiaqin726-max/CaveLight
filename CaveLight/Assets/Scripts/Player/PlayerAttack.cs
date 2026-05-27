@@ -4,7 +4,7 @@ public class PlayerAttack : MonoBehaviour
 {
     [Header("Attack")]
     public float attackDamage = 1f;
-    public float attackCooldown = 0.4f;
+    public float attackCooldown = 0.25f;
     public float attackRange = 1.2f;
     public float attackRadius = 1.1f;
     public Vector2 attackCenterOffset = new Vector2(0.35f, -0.2f);
@@ -16,10 +16,9 @@ public class PlayerAttack : MonoBehaviour
     {
         UpdateFacingDirection();
 
-        if (Input.GetMouseButtonDown(0) && Time.time >= nextAttackTime)
+        if (Input.GetMouseButton(0))
         {
-            Attack();
-            nextAttackTime = Time.time + attackCooldown;
+            TryAttackHeld();
         }
     }
 
@@ -41,6 +40,22 @@ public class PlayerAttack : MonoBehaviour
         if (Mathf.Abs(horizontalInput) > 0.01f)
         {
             lastFacingDirection = Mathf.Sign(horizontalInput);
+        }
+    }
+
+    private void TryAttackHeld()
+    {
+        if (Time.time < nextAttackTime)
+        {
+            return;
+        }
+
+        nextAttackTime = Time.time + attackCooldown;
+        Attack();
+
+        if (Debug.isDebugBuild)
+        {
+            Debug.Log("[ATTACK VERIFY] Held attack triggered");
         }
     }
 
