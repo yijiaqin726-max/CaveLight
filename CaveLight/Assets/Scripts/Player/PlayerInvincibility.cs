@@ -8,6 +8,7 @@ public class PlayerInvincibility : MonoBehaviour
 
     private PlayerEnergyStore energyStore;
     private SpriteRenderer spriteRenderer;
+    private PlayerAnimationController animationController;
     private Coroutine invincibleCoroutine;
     private bool missingEnergyStoreWarned;
 
@@ -15,10 +16,19 @@ public class PlayerInvincibility : MonoBehaviour
     {
         energyStore = GetComponent<PlayerEnergyStore>();
         spriteRenderer = GetComponent<SpriteRenderer>();
+        animationController = GetComponent<PlayerAnimationController>();
 
-        if (spriteRenderer == null)
+        if (spriteRenderer == null || !spriteRenderer.enabled)
         {
-            spriteRenderer = GetComponentInChildren<SpriteRenderer>();
+            SpriteRenderer[] renderers = GetComponentsInChildren<SpriteRenderer>();
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                if (renderers[i] != null && renderers[i].enabled)
+                {
+                    spriteRenderer = renderers[i];
+                    break;
+                }
+            }
         }
     }
 
@@ -51,6 +61,16 @@ public class PlayerInvincibility : MonoBehaviour
         }
 
         energyStore.TakeEnergyDamage(amount);
+        if (animationController == null)
+        {
+            animationController = GetComponent<PlayerAnimationController>();
+        }
+
+        if (animationController != null)
+        {
+            animationController.PlayHurt();
+        }
+
         StartInvincible();
         return true;
     }

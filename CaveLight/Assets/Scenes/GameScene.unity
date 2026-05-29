@@ -1008,13 +1008,13 @@ MonoBehaviour:
   wallTilemap: {fileID: 1017783212}
   groundTilemap: {fileID: 87464480}
   decorationTilemap: {fileID: 1384624855}
-  wallTile: {fileID: 11400000, guid: 38963c2ab5ad47dab2a515a885cfd9b8, type: 2}
-  groundTile: {fileID: 11400000, guid: d27f01ed6ba9467c94d6a211bb85830c, type: 2}
-  platformTile: {fileID: 11400000, guid: e5609aa467a740baa8c076e2951d8bce, type: 2}
-  bottomTile: {fileID: 11400000, guid: fb00648f4532496db887d133fd28e5d6, type: 2}
-  ceilingTile: {fileID: 11400000, guid: cd8a71b170834dbca93e1a050bf061fb, type: 2}
-  leftWallTile: {fileID: 11400000, guid: 5499cf3461cb4026b39ccd8934c08515, type: 2}
-  rightWallTile: {fileID: 11400000, guid: a69cd36bec834efba9adef7e20ed5e97, type: 2}
+  wallTile: {fileID: 11400000, guid: 22e81dd0dfb1454d8ebc6d132495c5de, type: 2}
+  groundTile: {fileID: 11400000, guid: 22e81dd0dfb1454d8ebc6d132495c5de, type: 2}
+  platformTile: {fileID: 11400000, guid: 22e81dd0dfb1454d8ebc6d132495c5de, type: 2}
+  bottomTile: {fileID: 11400000, guid: e93e623655e749a0bf3071365c746b1d, type: 2}
+  ceilingTile: {fileID: 11400000, guid: 28cfe89a1db748bf9de14eb8d0ee5b42, type: 2}
+  leftWallTile: {fileID: 11400000, guid: 8fb199f3284e454dbe740a10d1f3fce1, type: 2}
+  rightWallTile: {fileID: 11400000, guid: 79d550787b6c45fc926069c513fb62f2, type: 2}
   width: 24
   height: 12
   maxJumpHeight: 2

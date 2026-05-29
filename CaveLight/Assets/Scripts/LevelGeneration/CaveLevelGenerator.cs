@@ -19,6 +19,7 @@ public class CaveLevelGenerator : MonoBehaviour
     public Tile ceilingTile;
     public Tile leftWallTile;
     public Tile rightWallTile;
+    private bool designerTileVerifyLogged;
 
     [Header("Map Size")]
     public int width = 32;
@@ -319,9 +320,11 @@ public class CaveLevelGenerator : MonoBehaviour
             return;
         }
 
-        if (wallTilemap == null || groundTilemap == null || wallTile == null || groundTile == null)
+        VerifyDesignerTiles();
+
+        if (wallTilemap == null || groundTilemap == null || platformTile == null || bottomTile == null || ceilingTile == null || leftWallTile == null || rightWallTile == null)
         {
-            Debug.LogWarning("[CaveLevelGenerator] Missing references. Please assign Tilemaps and Tiles in the Inspector.");
+            Debug.LogWarning("[CaveLevelGenerator] Missing DesignerCave tile references. Assign Platform, Ceiling, Bottom, LeftWall, and RightWall tiles.");
             return;
         }
 
@@ -337,6 +340,7 @@ public class CaveLevelGenerator : MonoBehaviour
         FitCameraToGeneratedMap();
         LogMapAspectDebug();
         Debug.Log($"[VERIFY] WallTilemap tile count = {(wallTilemap != null ? wallTilemap.GetUsedTilesCount() : 0)}");
+        Debug.Log($"[DESIGNER TILE VERIFY] WallTilemap tile count = {(wallTilemap != null ? wallTilemap.GetUsedTilesCount() : 0)}");
 
         Debug.Log("[CaveLevelGenerator] Stable GameJam map generation completed.");
     }
@@ -584,7 +588,7 @@ public class CaveLevelGenerator : MonoBehaviour
 
         currentExit = Instantiate(exitPrefab, exitWorldPos, Quaternion.identity, levelObjectsRoot);
         currentExit.name = "ExitPlaceholder";
-        SetupImportantSpriteRenderer(currentExit, 900);
+        SetupImportantSpriteRenderer(currentExit, 999);
 
         SpriteRenderer spriteRenderer = currentExit.GetComponent<SpriteRenderer>();
         if (spriteRenderer != null)
@@ -741,27 +745,63 @@ public class CaveLevelGenerator : MonoBehaviour
 
     private Tile GetPlatformTile()
     {
-        return platformTile != null ? platformTile : wallTile;
+        return platformTile;
     }
 
     private Tile GetBottomTile()
     {
-        return bottomTile != null ? bottomTile : GetPlatformTile();
+        return bottomTile;
     }
 
     private Tile GetCeilingTile()
     {
-        return ceilingTile != null ? ceilingTile : GetPlatformTile();
+        return ceilingTile;
     }
 
     private Tile GetLeftWallTile()
     {
-        return leftWallTile != null ? leftWallTile : GetBottomTile();
+        return leftWallTile;
     }
 
     private Tile GetRightWallTile()
     {
-        return rightWallTile != null ? rightWallTile : GetBottomTile();
+        return rightWallTile;
+    }
+
+    private void VerifyDesignerTiles()
+    {
+        if (designerTileVerifyLogged)
+        {
+            return;
+        }
+
+        bool platformAssigned = platformTile != null;
+        bool ceilingAssigned = ceilingTile != null;
+        bool bottomAssigned = bottomTile != null;
+        bool leftAssigned = leftWallTile != null;
+        bool rightAssigned = rightWallTile != null;
+        bool ppuIs70 = HasPpu(platformTile, 70f) && HasPpu(ceilingTile, 70f) && HasPpu(bottomTile, 70f) && HasPpu(leftWallTile, 70f) && HasPpu(rightWallTile, 70f);
+        bool colliderTypeGrid = HasGridCollider(platformTile) && HasGridCollider(ceilingTile) && HasGridCollider(bottomTile) && HasGridCollider(leftWallTile) && HasGridCollider(rightWallTile);
+
+        Debug.Log($"[DESIGNER TILE VERIFY] Platform tile assigned = {platformAssigned}");
+        Debug.Log($"[DESIGNER TILE VERIFY] Ceiling tile assigned = {ceilingAssigned}");
+        Debug.Log($"[DESIGNER TILE VERIFY] Bottom tile assigned = {bottomAssigned}");
+        Debug.Log($"[DESIGNER TILE VERIFY] LeftWall tile assigned = {leftAssigned}");
+        Debug.Log($"[DESIGNER TILE VERIFY] RightWall tile assigned = {rightAssigned}");
+        Debug.Log($"[DESIGNER TILE VERIFY] PPU = {(ppuIs70 ? 70 : -1)}");
+        Debug.Log($"[DESIGNER TILE VERIFY] ColliderType = {(colliderTypeGrid ? "Grid" : "Invalid")}");
+
+        designerTileVerifyLogged = true;
+    }
+
+    private static bool HasPpu(Tile tile, float expectedPpu)
+    {
+        return tile != null && tile.sprite != null && Mathf.Approximately(tile.sprite.pixelsPerUnit, expectedPpu);
+    }
+
+    private static bool HasGridCollider(Tile tile)
+    {
+        return tile != null && tile.colliderType == Tile.ColliderType.Grid;
     }
 
     private void SetupImportantSpriteRenderer(GameObject instance, int sortingOrder)
@@ -804,7 +844,7 @@ public class CaveLevelGenerator : MonoBehaviour
         }
         else if (instance.name.Contains("Exit"))
         {
-            Debug.Log("[ORDER VERIFY] ExitPlaceholder order = 900");
+            Debug.Log("[ORDER VERIFY] Exit order = 999");
         }
     }
 
@@ -2216,6 +2256,7 @@ public class CaveLevelGenerator : MonoBehaviour
         TilemapCollider2D tilemapCollider = wallTilemap.GetComponent<TilemapCollider2D>();
         if (tilemapCollider != null)
         {
+            tilemapCollider.ProcessTilemapChanges();
             tilemapCollider.enabled = false;
             tilemapCollider.enabled = true;
         }
@@ -2232,6 +2273,8 @@ public class CaveLevelGenerator : MonoBehaviour
             composite.enabled = false;
             composite.enabled = true;
         }
+
+        Physics2D.SyncTransforms();
     }
 
     private void DrawCaveBounds()
@@ -2357,7 +2400,7 @@ public class CaveLevelGenerator : MonoBehaviour
 
         currentExit = Instantiate(exitPrefab, exitWorldPos, Quaternion.identity, levelObjectsRoot);
         currentExit.name = "ExitPlaceholder";
-        SetupImportantSpriteRenderer(currentExit, 900);
+        SetupImportantSpriteRenderer(currentExit, 999);
 
         SpriteRenderer spriteRenderer = currentExit.GetComponent<SpriteRenderer>();
         if (spriteRenderer != null)

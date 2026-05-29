@@ -11,6 +11,12 @@ public class PlayerAttack : MonoBehaviour
 
     private float nextAttackTime;
     private float lastFacingDirection = 1f;
+    private PlayerAnimationController animationController;
+
+    private void Awake()
+    {
+        animationController = GetComponent<PlayerAnimationController>();
+    }
 
     void Update()
     {
@@ -52,6 +58,15 @@ public class PlayerAttack : MonoBehaviour
 
         nextAttackTime = Time.time + attackCooldown;
         Attack();
+        if (animationController == null)
+        {
+            animationController = GetComponent<PlayerAnimationController>();
+        }
+
+        if (animationController != null)
+        {
+            animationController.PlayAttack();
+        }
 
         if (Debug.isDebugBuild)
         {
